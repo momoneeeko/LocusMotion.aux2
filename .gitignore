@@ -1,0 +1,13 @@
+# Visual Studio
+.vs/
+x64/
+
+# Visual Studio resource editor
+*.aps
+
+# Build files
+Debug/
+Release/
+*.obj
+*.pdb
+*.ilk
