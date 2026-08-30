@@ -2,7 +2,10 @@
 トラックバー移動モードで使用できるカーブを作成するためのAviUtl2プラグイン
 
 ## 導入方法
-[Releases](https://github.com/momoneeeko/LocusMotion.aux2/releases)から最新版の導入方法に従ってください。
+1.[Releases](https://github.com/momoneeeko/LocusMotion.aux2/releases)から最新版の**LocusMotion.au2pkg.zip**をダウンロード
+2.ダウンロードしたzipファイルをそのままAviUtl2のプレビュー画面にドラッグ&ドロップ
+3."スクリプト・プラグインの追加"ポップアップが出たら任意で"このスクリプト・プラグインを信頼して使用する"をクリック
+4.上部ツールバーから"表示"→"LocusMotion"を選択するとプラグインのウィンドウが表示されます。
 
 ## 概要
 ### 内容物
