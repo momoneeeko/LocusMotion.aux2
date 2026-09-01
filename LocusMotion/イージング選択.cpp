@@ -2,6 +2,7 @@
 #include <windows.h>
 #include "Direct2D.h"
 #include "Dialog.h"
+#include <d2d1_3.h>
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -130,6 +131,96 @@ void Draw_Text_Dialog(ID2D1RenderTarget* pTarget, ID2D1SolidColorBrush* pBrush, 
 	}
 }
 
+void Draw_Svg_Dialog(ID2D1RenderTarget* pTarget, int resourceId, D2D1_RECT_F rect, float size, float angle, D2D1_COLOR_F color) {
+	if (!pTarget) return;
+
+	ComPtr<ID2D1DeviceContext5> pDC;
+	if (FAILED(pTarget->QueryInterface(IID_PPV_ARGS(&pDC))) || !pDC) return;
+
+	// DLL自身のモジュールハンドルを取得する
+	HMODULE hInst = NULL;
+	GetModuleHandleExW(
+		GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+		reinterpret_cast<LPCWSTR>(&Draw_Svg_Dialog),
+		&hInst
+	);
+
+	HRSRC hRes = FindResource(hInst, MAKEINTRESOURCE(resourceId), RT_RCDATA);
+	if (!hRes) return; // ← GetModuleHandle(NULL) だとここで失敗していました
+
+	HGLOBAL hMem = LoadResource(hInst, hRes);
+	if (!hMem) return;
+
+	DWORD resSize = SizeofResource(hInst, hRes);
+	void* pData = LockResource(hMem);
+	if (!pData) return;
+
+	IStream* pStream = SHCreateMemStream(static_cast<const BYTE*>(pData), resSize);
+	if (!pStream) return;
+
+	ComPtr<ID2D1SvgDocument> pSvg;
+	HRESULT hr = pDC->CreateSvgDocument(pStream, D2D1::SizeF(100.0f, 100.0f), &pSvg);
+	pStream->Release();
+	if (FAILED(hr) || !pSvg) return;
+
+	// Root要素の取得と viewBox / 色 / 透明度の設定
+	ComPtr<ID2D1SvgElement> pRoot;
+	pSvg->GetRoot(&pRoot);
+	if (pRoot) {
+		// ViewBoxの設定を適用（描画サイズの正常化）
+		D2D1_SVG_VIEWBOX viewBox = {};
+		if (SUCCEEDED(pRoot->GetAttributeValue(L"viewBox", D2D1_SVG_ATTRIBUTE_POD_TYPE_VIEWBOX, &viewBox, sizeof(viewBox)))) {
+			if (viewBox.width > 0.0f && viewBox.height > 0.0f) {
+				pSvg->SetViewportSize(D2D1::SizeF(viewBox.width, viewBox.height));
+			}
+		}
+
+		// 色設定
+		wchar_t colorStr[64];
+		swprintf_s(colorStr, L"rgb(%d, %d, %d)",
+			static_cast<int>(color.r * 255.0f),
+			static_cast<int>(color.g * 255.0f),
+			static_cast<int>(color.b * 255.0f));
+		pRoot->SetAttributeValue(L"fill", D2D1_SVG_ATTRIBUTE_STRING_TYPE_SVG, colorStr);
+
+		// 不透明度設定
+		wchar_t opacityStr[32];
+		swprintf_s(opacityStr, L"%f", color.a);
+		pRoot->SetAttributeValue(L"fill-opacity", D2D1_SVG_ATTRIBUTE_STRING_TYPE_SVG, opacityStr);
+	}
+
+	// 描画サイズと行列変形
+	D2D1_SIZE_F originalSize = pSvg->GetViewportSize();
+	if (originalSize.width <= 0.0f || originalSize.height <= 0.0f) {
+		originalSize = D2D1::SizeF(100.0f, 100.0f);
+	}
+
+	float rectWidth = rect.right - rect.left;
+	float rectHeight = rect.bottom - rect.top;
+	if (rectWidth <= 0.0f || rectHeight <= 0.0f) return;
+
+	float rectCenterX = rect.left + rectWidth / 2.0f;
+	float rectCenterY = rect.top + rectHeight / 2.0f;
+
+	float scaleX = rectWidth / originalSize.width;
+	float scaleY = rectHeight / originalSize.height;
+	float baseScale = (std::min)(scaleX, scaleY);
+	float finalScale = baseScale * size;
+
+	D2D1_MATRIX_3X2_F oldTransform;
+	pDC->GetTransform(&oldTransform);
+
+	D2D1_MATRIX_3X2_F transform =
+		D2D1::Matrix3x2F::Translation(-originalSize.width / 2.0f, -originalSize.height / 2.0f) *
+		D2D1::Matrix3x2F::Rotation(angle) *
+		D2D1::Matrix3x2F::Scale(finalScale, finalScale) *
+		D2D1::Matrix3x2F::Translation(rectCenterX, rectCenterY);
+
+	pDC->SetTransform(transform * oldTransform);
+	pDC->DrawSvgDocument(pSvg.Get());
+	pDC->SetTransform(oldTransform);
+}
+
 struct DialogState {
 	int resultValue = 0;
 	bool confirmed = false;
@@ -246,14 +337,14 @@ bool EasingWindow(HWND hParent, const wchar_t* title, int& outValue, CUR Cursor)
 							Paint = true;
 						}
 						else {
-							wchar_t buf[32] = { 0 };
-							GetWindowTextW(pState->hEdit, buf, 32);
-							pState->resultValue = Result;
-							pState->confirmed = true;
+							if (pState) {
+								pState->resultValue = Result;
+								pState->confirmed = true;
+							}
 							DestroyWindow(hwnd);
+							break;
 						}
 					}
-					
 				}
 				if (Paint) {
 					InvalidateRect(hwnd, NULL, FALSE);
@@ -318,6 +409,7 @@ bool EasingWindow(HWND hParent, const wchar_t* title, int& outValue, CUR Cursor)
 
 			case WM_DESTROY: {
 				KillTimer(hwnd, 2);
+				Easing.clear();
 				if (pState) {
 					if (pState->pBrush) { pState->pBrush->Release(); pState->pBrush = nullptr; }
 					if (pState->pRenderTarget) { pState->pRenderTarget->Release(); pState->pRenderTarget = nullptr; }

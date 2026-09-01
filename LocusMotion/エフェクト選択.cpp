@@ -92,12 +92,12 @@ bool P_Effect::Locus_Update(D2D1_RECT_F Rect, CUR Cursor) const {
 		}
 
 		if (Cursor.drop && LocusHover[i]) {
-			LocusData.CLocus[LocusID].Locuses[i] = locuses.ToLocuses();
+			LocusData.CLocus[LocusID].Locuses[i].LoadLocuses(Editor.ToLocuses());
 			Return = true;
 		}
 
 		if (click && !drag && !Cursor.clicking && LocusHover[i]) {
-			locuses.SetLocuses(LocusData.CLocus[LocusID].Locuses[i]);
+			Editor.SetLocuses(LocusData.CLocus[LocusID].Locuses[i]);
 			click = false;
 			drag = false;
 			Return = true;
@@ -106,17 +106,18 @@ bool P_Effect::Locus_Update(D2D1_RECT_F Rect, CUR Cursor) const {
 		if (Cursor.rclick && LocusHover[i]) {
 			HMENU hMenu = CreatePopupMenu();
 			if (hMenu) {
+				AppendMenuW(hMenu, MF_STRING, 104, L"エディタの曲線を適用");
+				AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
 				AppendMenuW(hMenu, MF_STRING, 101, L"コピー");
 				AppendMenuW(hMenu, MF_STRING, 102, L"全てコピー");
-				if(effects.UseCopyLocuses || effects.UseCopyCLocus){
+				if(Effects.UseCopyLocuses || Effects.UseCopyCLocus){
 					AppendMenuW(hMenu, MF_STRING, 103, L"貼り付け");
 				}
 				else {
 					AppendMenuW(hMenu, MF_STRING | MF_GRAYED, 103, L"貼り付け");
 				}
 				AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
-				AppendMenuW(hMenu, MF_STRING, 104, L"エディタの曲線を適用");
-				AppendMenuW(hMenu, MF_STRING, 105, L"モディファイア(未実装)");
+				AppendMenuW(hMenu, MF_STRING, 105, L"モディファイア");
 
 				POINT pt = { (LONG)Cursor.x, (LONG)Cursor.y };
 				ClientToScreen(Cursor.hwnd, &pt);
@@ -132,24 +133,24 @@ bool P_Effect::Locus_Update(D2D1_RECT_F Rect, CUR Cursor) const {
 
 				switch (cmd) {
 				case 101: {
-					effects.CopyLocuses = LocusData.CLocus[LocusID].Locuses[i];
-					effects.UseCopyLocuses = true;
-					effects.UseCopyCLocus = false;
+					Effects.CopyLocuses = LocusData.CLocus[LocusID].Locuses[i];
+					Effects.UseCopyLocuses = true;
+					Effects.UseCopyCLocus = false;
 					break;
 				}
 				case 102: {
-					effects.CopyCLocus = LocusData.CLocus[LocusID];
-					effects.UseCopyLocuses = false;
-					effects.UseCopyCLocus = true;
+					Effects.CopyCLocus = LocusData.CLocus[LocusID];
+					Effects.UseCopyLocuses = false;
+					Effects.UseCopyCLocus = true;
 					break;
 				}
 				case 103: {
-					if (effects.UseCopyLocuses) {
-						LocusData.CLocus[LocusID].Locuses[i] = effects.CopyLocuses;
+					if (Effects.UseCopyLocuses) {
+						LocusData.CLocus[LocusID].Locuses[i] = Effects.CopyLocuses;
 					}
-					if (effects.UseCopyCLocus) {
+					if (Effects.UseCopyCLocus) {
 						auto& targetLocuses = LocusData.CLocus[LocusID].Locuses;
-						const auto& copyLocuses = effects.CopyCLocus.Locuses;
+						const auto& copyLocuses = Effects.CopyCLocus.Locuses;
 
 						if (!copyLocuses.empty()) {
 							size_t targetSize = targetLocuses.size();
@@ -171,13 +172,13 @@ bool P_Effect::Locus_Update(D2D1_RECT_F Rect, CUR Cursor) const {
 					break;
 				}
 				case 104: {
-					LocusData.CLocus[LocusID].Locuses[i] = locuses.ToLocuses();
+					LocusData.CLocus[LocusID].Locuses[i].LoadLocuses(Editor.ToLocuses());
 					break;
 				}
 				case 105: {
-					int inputNum = 0;
-					if (ModifierWindow(Cursor.hwnd, L"モディファイア", inputNum, Cursor)) {
-
+					// LocusData.CLocus[LocusID].Locuses[i] の参照を直接渡す
+					if (ModifierWindow(Cursor.hwnd, L"モディファイア", Cursor, LocusData.CLocus[LocusID].Locuses[i])) {
+						Return = true;
 					}
 					break;
 				}
@@ -454,10 +455,10 @@ bool P_Effect::Update(D2D1_RECT_F Rect, CUR Cursor) const {
 
 	if (Cursor.drop && Hover && Tipe == L"項目") {
 		if (Use) {
-			LocusData.SetAllLocuses(LocusID, locuses.ToLocuses());
+			LocusData.SetAllLocuses(LocusID, Editor.ToLocuses());
 		}
 		else {
-			int ID = LocusData.NewSetLocuses(SectionNum, locuses.ToLocuses());
+			int ID = LocusData.NewSetLocuses(SectionNum, Editor.ToLocuses());
 			SetTrackbar(ID);
 			Use = true;
 			LocusID = ID;
@@ -477,7 +478,7 @@ bool P_Effect::Update(D2D1_RECT_F Rect, CUR Cursor) const {
 						AppendMenuW(hMenu, MF_STRING, 101, L"新規作成");
 						AppendMenuW(hMenu, MF_STRING, 102, L"エディタの曲線を適用");
 						AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
-						if (effects.CopyID == -1) {
+						if (Effects.CopyID == -1) {
 							AppendMenuW(hMenu, MF_STRING | MF_GRAYED, 103, L"貼り付け");
 						}
 						else {
@@ -509,7 +510,7 @@ bool P_Effect::Update(D2D1_RECT_F Rect, CUR Cursor) const {
 						}
 						case 102:
 						{
-							int new_id = LocusData.NewSetLocuses(SectionNum, locuses.ToLocuses());
+							int new_id = LocusData.NewSetLocuses(SectionNum, Editor.ToLocuses());
 							SetTrackbar(new_id);
 
 							Use = true;
@@ -519,7 +520,7 @@ bool P_Effect::Update(D2D1_RECT_F Rect, CUR Cursor) const {
 						}
 						case 103:
 						{
-							SetTrackbar(effects.CopyID);
+							SetTrackbar(Effects.CopyID);
 							Use = true;
 							Return = true;
 							break;
@@ -535,7 +536,7 @@ bool P_Effect::Update(D2D1_RECT_F Rect, CUR Cursor) const {
 			HMENU hMenu = CreatePopupMenu();
 			if (hMenu) {
 				AppendMenuW(hMenu, MF_STRING, 101, L"コピー");
-				if (effects.CopyID == -1) {
+				if (Effects.CopyID == -1) {
 					AppendMenuW(hMenu, MF_STRING | MF_GRAYED, 102, L"貼り付け");
 				}
 				else {
@@ -560,13 +561,13 @@ bool P_Effect::Update(D2D1_RECT_F Rect, CUR Cursor) const {
 				switch (cmd) {
 				case 101:
 				{
-					effects.CopyID = LocusID;
+					Effects.CopyID = LocusID;
 					break;
 				}
 				case 102: 
 				{
-					if (effects.CopyID != -1) {
-						ChangeIDTrackbar(effects.CopyID);
+					if (Effects.CopyID != -1) {
+						ChangeIDTrackbar(Effects.CopyID);
 					}
 					break;
 				}
@@ -659,6 +660,8 @@ void P_Effect::Locus_Draw(D2D1_RECT_F Rect, CUR* Cursor) const {
 		D2D1_RECT_F DrawRect = D2D1::RectF(left, Rect.top, left + width[i], Rect.bottom - 20.0f);
 
 		g_pBrush->SetColor(D2D1::ColorF(config->get_color_code(config, "Background")));
+		g_pRenderTarget->FillRectangle(DrawRect, g_pBrush);
+		g_pBrush->SetColor(D2D1::ColorF( 0x7274db, (LocusData.CLocus[LocusID].Locuses[i].Modifier.size() != 0) ? 0.1f : 0.0f));
 		g_pRenderTarget->FillRectangle(DrawRect, g_pBrush);
 		g_pBrush->SetColor(D2D1::ColorF(0xffffff, LocusHoverAnime[i]*0.1f));
 		g_pRenderTarget->FillRectangle(DrawRect, g_pBrush);
@@ -850,8 +853,12 @@ void P_Effects::GetObjectEffects() {
 
 					float total_length = static_cast<float>(frame.end - frame.start + 1);
 					child_item.SectionWidth.clear();
+					child_item.FrameS.clear(); child_item.FrameF.clear();
+
 					if (child_item.SectionNum <= 1 || total_length <= 0.0f) {
 						child_item.SectionWidth.push_back(1.0f);
+						child_item.FrameS.push_back(static_cast<float>(frame.start));
+						child_item.FrameF.push_back(static_cast<float>(frame.end));
 					}
 					else {
 						std::vector<int> section_frames;
@@ -860,11 +867,15 @@ void P_Effects::GetObjectEffects() {
 							section_frames.push_back(p_enum->edit->get_object_section_frame(p_enum->obj_handle, i));
 						}
 						section_frames.push_back(frame.end + 1);
+
 						for (int i = 0; i < child_item.SectionNum; ++i) {
 							int sec_start = section_frames[i];
 							int sec_end = section_frames[i + 1];
 							float sec_length = static_cast<float>(sec_end - sec_start);
+
 							child_item.SectionWidth.push_back(sec_length / total_length);
+							child_item.FrameS.push_back(static_cast<float>(sec_start));
+							child_item.FrameF.push_back(static_cast<float>(sec_end - 1));
 						}
 					}
 
@@ -921,7 +932,7 @@ void P_Effects::GetObjectEffects() {
 
 									}
 									else {
-										child_item.LocusID = LocusData.NewSetLocuses(child_item.SectionNum, locuses.ToLocuses());
+										child_item.LocusID = LocusData.NewSetLocuses(child_item.SectionNum, Editor.ToLocuses());
 										track_info.param[0] = child_item.LocusID;
 										child_item.InitialLocusID = true;
 									}
@@ -946,7 +957,7 @@ void P_Effects::GetObjectEffects() {
 							NewLocus.Turn = false;
 							NewLocus.S = { 0.0f, 0.0f };
 							NewLocus.H1 = { 0.3f, 0.3f };
-							NewLocus.H2 = { 0.0f, 0.0f };
+							NewLocus.H2 = { 0.7f, 0.7f };
 							NewLocus.F = { 1.0f, 1.0f };
 							NewLocuses.Locus.push_back(NewLocus);
 

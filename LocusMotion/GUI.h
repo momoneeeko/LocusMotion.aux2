@@ -9,14 +9,111 @@ using Microsoft::WRL::ComPtr;
 
 #include "plugin2.h"
 
+extern EDIT_HANDLE* edit_handle;
+
 struct POS {
 	float x = 0.0f;
 	float y = 0.0f;
 };
 
+struct CUR_MOD {
+	HWND hwnd = NULL;
+	float x = 0.0f;
+	float y = 0.0f;
+	float wheel = 0.0f;
+	bool click = false;
+	bool RectCheck(D2D1_RECT_F Rect) const {
+		return (Rect.left < x && x < Rect.right && Rect.top < y && y < Rect.bottom);
+	}
+};
+
 struct MODIFIER {
 	int Mode = 0;
-	std::vector<double> param;
+	std::vector<double> Param;
+
+	std::vector<bool> ParamHover;
+	std::vector<float> ParamHoverAnime;
+	std::vector<bool> ParamUse;
+
+	MODIFIER() : MODIFIER(1) {}
+
+	MODIFIER(int Mode) {
+		this->Mode = Mode;
+		switch (Mode) {
+		case 1: {	//コマ落ち
+			Param.push_back(5.0);	// 間隔
+			Param.push_back(2.0);	// 0=秒, 1=ミリ秒, 2=フレーム, 3=FPS 4=BPM 5=BPM取得
+			Param.push_back(0.0);	// 開始位置
+			Param.push_back(0.0);	// 0=秒, 1=ミリ秒, 2=フレーム 3=BPM参照
+			for (int i = 0; i < 4; i++) {
+				ParamHover.push_back(false);
+				ParamHoverAnime.push_back(0.0f);
+				ParamUse.push_back(false);
+			}
+			break;
+		}
+		case 2: {	//離散化
+			Param.push_back(10.0);	// 離散化個数
+			Param.push_back(0.0);	// 0=切り捨て, 1=四捨五入, 2=切り上げ
+			for (int i = 0; i < 2; i++) {
+				ParamHover.push_back(false);
+				ParamHoverAnime.push_back(0.0f);
+				ParamUse.push_back(false);
+			}
+			break;
+		}
+		case 3: {
+			Param.push_back(1.0);	// 増分
+			for (int i = 0; i < 1; i++) {
+				ParamHover.push_back(false);
+				ParamHoverAnime.push_back(0.0f);
+				ParamUse.push_back(false);
+			}
+			break;
+		}
+		}
+	}
+
+	double ChengeUnit(int Moto, int Ato, double Value) {
+		double Milli = Value; // 初期値を設定
+		switch (Moto) {
+		case 0: Milli = Value * 1000.0; break;
+		case 1: Milli = Value; break;
+		case 2: {
+			EDIT_INFO info{};
+			edit_handle->get_edit_info(&info, sizeof(EDIT_INFO));
+			if (info.scale != 0) {
+				double framerate = static_cast<double>(info.rate) / info.scale;
+				Milli = (framerate != 0.0) ? (Value / framerate * 1000.0) : 0.0;
+			}
+			break;
+		}
+		case 3: Milli = (Value != 0.0) ? (1000.0 / Value) : 0.0; break;
+		case 4: Milli = (Value != 0.0) ? (60000.0 / Value) : 0.0; break;
+		case 5: Milli = 1000.0; break;
+		}
+
+		switch (Ato) {
+		case 0: return Milli / 1000.0;
+		case 1: return Milli;
+		case 2: {
+			EDIT_INFO info{};
+			edit_handle->get_edit_info(&info, sizeof(EDIT_INFO));
+			if (info.scale != 0) {
+				double framerate = static_cast<double>(info.rate) / info.scale;
+				return framerate * (Milli / 1000.0);
+			}
+			return 0.0;
+		}
+		case 3: return (Milli != 0.0) ? (1000.0 / Milli) : 0.0;
+		case 4: return (Milli != 0.0) ? (60000.0 / Milli) : 0.0;
+		case 5: return 1.0;
+		}
+
+		return Milli; // 必ず値を返す
+	}
+	bool UpdataParam(D2D1_RECT_F Rect, CUR_MOD* Cursor);
+	void PaintParam(ID2D1RenderTarget* pTarget, ID2D1SolidColorBrush* pBrush, D2D1_RECT_F Rect);
 };
 
 struct LOCUS {			//Locusの最小単位
@@ -33,7 +130,16 @@ struct LOCUS {			//Locusの最小単位
 struct LOCUSES {		//Locusを集めたもの。
 	std::vector<LOCUS> Locus;
 	std::vector<MODIFIER> Modifier;
+
 	double LocusesToValue(double Time, int n);
+	double PlayModifier(double x, double Time, double framerate, int n);
+
+	void LoadLocuses(LOCUSES Locuses) {
+		Locus.clear();
+		for (int i = 0; i < Locuses.Locus.size(); i++) {
+			Locus.push_back(Locuses.Locus[i]);
+		}
+	}
 };
 
 struct CLOCUS {			//LocusesをAviUtl側の中間点の数分用意したもの
@@ -88,7 +194,7 @@ struct CUR {
 	bool mclick = false;
 	bool mclicking = false;
 	bool mdclick = false;
-	D2D1_POINT_2F move = D2D1::Point2(0.0f,0.0f);
+	D2D1_POINT_2F move = D2D1::Point2F(0.0f, 0.0f);
 	bool moveing = false;
 	bool action = false;
 	RANGE range;
@@ -199,7 +305,11 @@ public:
 	mutable int SectionNum = 1;
 	mutable std::vector<float> Value;
 	mutable float maxValue = 0.0f, minValue = 0.0f;
+
+	mutable std::vector<float> FrameS;
+	mutable std::vector<float> FrameF;
 	mutable std::vector<float> SectionWidth;
+
 	mutable std::vector<ComPtr<ID2D1PathGeometry>> Geometry;
 	mutable std::vector<bool> LocusHover;
 	mutable std::vector<float> LocusHoverAnime;
@@ -252,7 +362,7 @@ public:
 	void Draw(CUR Cursor);
 };
 
-extern EDITOR locuses;
-extern P_Effects effects;
+extern EDITOR Editor;
+extern P_Effects Effects;
 extern CUR cursor;
 extern LOCUSDATA LocusData;

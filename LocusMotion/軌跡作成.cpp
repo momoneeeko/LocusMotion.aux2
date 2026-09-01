@@ -223,35 +223,77 @@ double LOCUS::LocusToValue(double Time, int n) {
     return out;
 }
 
+//追加したいモディファイア
+// ☆コマ落ち
+// ☆離散化
+// ・直線化 (一定間隔で直線にする)
+// ・ループ (0~1を(回数)繰り返す)
+// ・反転ループ (0~1,1~0を(回数)繰り返す)
+// ・段々ループ
+// ・速度を取得 (曲線の傾きを取得)
+// ・波を合成 (正弦波やランダムなどを合成)
+
 double LOCUSES::LocusesToValue(double Time, int n) {
-    float out = 0.0f;
+    double out = 0.0f;
     for (size_t i = 0; i < Locus.size(); i++) {
         if (Locus[i].S.x <= Time && Time <= Locus[i].F.x) {
             float duration = Locus[i].F.x - Locus[i].S.x;
             if (duration > 0.0001f) {
-                float localTime = (Time - Locus[i].S.x) / duration;
+                double localTime = (Time - Locus[i].S.x) / duration;
                 out = Locus[i].LocusToValue(localTime, n) * (Locus[i].F.y - Locus[i].S.y) + Locus[i].S.y;
             }
             else {
                 out = Locus[i].LocusToValue(0.0f, n);
             }
-            return out;
         }
     }
+    return out;
+}
+
+double LOCUSES::PlayModifier(double x, double Time, double framerate, int n) {
+    double t = x;
+    double out = 0.0;
+    double Trans = 0.1;
+    //前半モディファイア
     for (int i = 0; i < Modifier.size(); i++) {
-
-        //追加したいモディファイア
-        // ・離散化
-        // ・直線化 (一定間隔で直線にする)
-        // ・ループ (0~1を(回数)繰り返す)
-        // ・反転ループ (0~1,1~0を(回数)繰り返す)
-        // ・段々ループ
-        // ・速度を取得 (曲線の傾きを取得)
-        // ・波を合成 (正弦波やランダムなどを合成)
-
         switch (Modifier[i].Mode) {
-        case 0: {
+        case 1: {   //コマ落ち
+            double v = Modifier[i].ChengeUnit((int)Modifier[i].Param[1], 0, Modifier[i].Param[0]); //間隔
+            double p = Modifier[i].ChengeUnit((int)Modifier[i].Param[3], 0, Modifier[i].Param[2]);
+            t = floor(x * (Time / v) - p) / (Time / v) + p;
+            break;
+        }
+        }
+    }
 
+    // Timeから数値を計算
+    out = LocusesToValue(t, n);
+
+    //後半モディファイア
+    for (int i = 0; i < Modifier.size(); i++) {
+        switch (Modifier[i].Mode) {
+        case 2: {   //離散化
+            if (Modifier[i].Param[1] == 0.0) {
+                out = floor(out * Modifier[i].Param[0]) / Modifier[i].Param[0];
+            }
+            else if (Modifier[i].Param[1] == 1.0) {
+                out = round(out * Modifier[i].Param[0]) / Modifier[i].Param[0];
+            }
+            else {
+                out = ceil(out * Modifier[i].Param[0]) / Modifier[i].Param[0];
+            }
+            break;
+        }
+        case 3: {   //速度化
+            if (t - Modifier[i].Param[0] / 100.0 / 2.0 <= 0.0) {
+                out = (LocusesToValue(t + Modifier[i].Param[0] / 100.0 / 2.0, n) - LocusesToValue(t, n)) / (Modifier[i].Param[0] / 100.0 / 2.0);
+            }
+            else if (t + Modifier[i].Param[0] / 100 / 2.0 >= 1.0) {
+                out = (LocusesToValue(t, n) - LocusesToValue(t - Modifier[i].Param[0] / 100.0 / 2.0, n)) / (Modifier[i].Param[0] / 100.0 / 2.0);
+            }
+            else {
+                out = (LocusesToValue(t + Modifier[i].Param[0] / 100.0 / 2.0, n) - LocusesToValue(t - Modifier[i].Param[0] / 100.0 / 2.0, n)) / (Modifier[i].Param[0] / 100.0);
+            }
             break;
         }
         }
@@ -334,7 +376,7 @@ void LOCUSDATA::SetAllLocuses(int LocusID, LOCUSES Locuses) {
         return;
     }
     for (size_t i = 0; i < CLocus[LocusID].Locuses.size(); i++) {
-        CLocus[LocusID].Locuses[i] = Locuses;
+        CLocus[LocusID].Locuses[i].LoadLocuses(Locuses);
     }
 }
 
@@ -350,7 +392,10 @@ void P_Effect::UpdateGeometry(LOCUSES Locus, D2D1_RECT_F Rect, int Section, floa
     float n = (std::max)(width, 10.0f);
     for (int i = 0; i <= (int)n; i++) {
         float x = (float)i / n;
-        float locusVal = (float)Locus.LocusesToValue(x, 20);
+        EDIT_INFO info{};
+        edit_handle->get_edit_info(&info, sizeof(EDIT_INFO));
+        double framerate = static_cast<double>(info.rate) / info.scale;
+        float locusVal = (float)Locus.PlayModifier(x, (FrameF[0] - FrameS[0]) / framerate, framerate, 20);
         float currentNorm = normS + (normE - normS) * locusVal;
         float drawX = Rect.left + x * width;
         float drawY = Rect.bottom - currentNorm * height;
@@ -383,7 +428,7 @@ void EDIT_LOCUSES::UpdateGeometry(float size, D2D1_POINT_2F OllCenter) const {
     float n = (std::min)((std::max)((abs(Locus[Mode].F.x - Locus[Mode].S.x) * size), 10.0f), 1000.0f) * 3.0f;
     for (int i = 0; i <= (int)n; i++) {
         float x = i / n;
-        float y = Locus[Mode].LocusToValue(x, 20);
+        float y = (float)Locus[Mode].LocusToValue(x, 20);
         Samples.push_back(D2D1::Point2((x * 2.0f - 1.0f) * SizeXG + Center.x, (y * -2.0f + 1.0f) * SizeYG + Center.y));
     }
 

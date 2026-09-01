@@ -76,15 +76,15 @@ UINT WinWidth = 0;
 UINT WinHeight = 0;
 D2D1_POINT_2F BeforCursor = D2D1::Point2(0.0f, 0.0f);
 CUR cursor;
-EDITOR locuses;
-P_Effects effects;
+EDITOR Editor;
+P_Effects Effects;
 LOCUSDATA LocusData;
 HWND g_hPluginWnd = NULL;
 bool WindowResize = true;
 
 void OnEvent(void* param) {
 	HWND hwnd = (HWND)param;
-	effects.GetObjectEffects();
+	Effects.GetObjectEffects();
 	WindowResize = true;
 }
 
@@ -148,8 +148,8 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		defaultLocus.Locus[3].F = { 1.0f, 1.0f };
 		defaultLocus.LocusUI[3].F = { 10.0f, 10.0f };
 
-		locuses.Locus.push_back(defaultLocus);
-		locuses.SelectLocus = 0;
+		Editor.Locus.push_back(defaultLocus);
+		Editor.SelectLocus = 0;
 
 		SetTimer(hwnd, 1, 1000 / 60, NULL);
 
@@ -172,10 +172,12 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		BeginPaint(hwnd, &ps);
 		if (SUCCEEDED(CreateDeviceResources(hwnd))) {
 			g_pRenderTarget->BeginDraw();
-			g_pRenderTarget->Clear(D2D1::ColorF(config->get_color_code(config, "Background")));
 
-			locuses.Draw(cursor);
-			effects.Draw(cursor);
+			COLORREF bgColor = (config && config->get_color_code) ? config->get_color_code(config, "Background") : 0x202020;
+			g_pRenderTarget->Clear(D2D1::ColorF(bgColor));
+
+			Editor.Draw(cursor);
+			Effects.Draw(cursor);
 
 			HRESULT hr = g_pRenderTarget->EndDraw();
 			if (hr == D2DERR_RECREATE_TARGET) {
@@ -186,12 +188,12 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		return 0;
 	}
 	case WM_TIMER: {
-		cursor.range.Update(D2D1::RectF(0.0f, 0.0f, (float)WinWidth, (float)WinHeight), effects.HideAnime);
+		cursor.range.Update(D2D1::RectF(0.0f, 0.0f, (float)WinWidth, (float)WinHeight), Effects.HideAnime);
 		cursor.move = D2D1::Point2(cursor.x - BeforCursor.x, cursor.y - BeforCursor.y);
 		BeforCursor = D2D1::Point2(cursor.x, cursor.y);
-		if (cursor.action || locuses.AnimeMoving || effects.AnimeMoving || WindowResize) {
-			bool LocusRedraw = locuses.Update(&cursor, WindowResize);
-			bool EffectRedraw = effects.Update(cursor);
+		if (cursor.action || Editor.AnimeMoving || Effects.AnimeMoving || WindowResize) {
+			bool LocusRedraw = Editor.Update(&cursor, WindowResize);
+			bool EffectRedraw = Effects.Update(cursor);
 			if (LocusRedraw || EffectRedraw) {
 				InvalidateRect(hwnd, NULL, FALSE);
 			}
@@ -306,8 +308,10 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 //---------------------------------------------------------------------
 void GetLocus(SCRIPT_MODULE_PARAM* param) {
 	int LocusID = param->get_param_int(0);
-	int Section = param->get_param_int(1);
+	int Section = (std::max)(param->get_param_int(1),0);
 	double x = param->get_param_double(2);
+	double time = param->get_param_array_double(3, Section + 1) - param->get_param_array_double(3, Section);
+	double framerate = param->get_param_double(4);
 
 	if (LocusID < 0 || LocusID >= (int)LocusData.CLocus.size()) {
 		param->push_result_double(-1.0);
@@ -319,7 +323,7 @@ void GetLocus(SCRIPT_MODULE_PARAM* param) {
 		return;
 	}
 
-	double Out = LocusData.CLocus[LocusID].Locuses[Section].LocusesToValue(x, 20);
+	double Out = LocusData.CLocus[LocusID].Locuses[Section].PlayModifier(x, time, framerate, 20);
 	param->push_result_double(Out);
 }
 
@@ -365,8 +369,8 @@ void OnProjectSave(PROJECT_FILE* project) {
 				//MODIFIERの保存
 				oss << " " << locuses_item.Modifier.size();
 				for (const auto& modifier : locuses_item.Modifier) {
-					oss << " " << modifier.Mode << " " << modifier.param.size();
-					for (const auto& p : modifier.param) {
+					oss << " " << modifier.Mode << " " << modifier.Param.size();
+					for (const auto& p : modifier.Param) {
 						oss << " " << p;
 					}
 				}
@@ -429,14 +433,18 @@ void OnProjectLoad(PROJECT_FILE* project) {
 				size_t modifierCount = 0;
 				if (iss >> modifierCount) {
 					for (size_t m = 0; m < modifierCount; ++m) {
-						MODIFIER modifier;
+						int mode = 0;
 						size_t paramCount = 0;
-						if (!(iss >> modifier.Mode >> paramCount)) break;
+						if (!(iss >> mode >> paramCount)) break;
+
+						// 正しいModeでコンストラクタを呼び出し、ParamHoverやParamHoverAnimeを確保させる
+						MODIFIER modifier(mode);
+						modifier.Param.clear(); // デフォルト値を破棄して保存データで上書き
 
 						for (size_t p = 0; p < paramCount; ++p) {
 							double val = 0.0;
 							if (!(iss >> val)) break;
-							modifier.param.push_back(val);
+							modifier.Param.push_back(val);
 						}
 						locuses_item.Modifier.push_back(modifier);
 					}
@@ -510,10 +518,10 @@ void ProcApplyEditorLocusItemMenu(EDIT_SECTION* edit, OBJECT_HANDLE object, LPCW
 	int section_num = edit->get_object_section_num(object);
 
 	if (target_locus_id < 0 || target_locus_id >= static_cast<int>(LocusData.CLocus.size())) {
-		target_locus_id = LocusData.NewSetLocuses(section_num, locuses.ToLocuses());
+		target_locus_id = LocusData.NewSetLocuses(section_num, Editor.ToLocuses());
 	}
 	else {
-		LocusData.SetAllLocuses(target_locus_id, locuses.ToLocuses());
+		LocusData.SetAllLocuses(target_locus_id, Editor.ToLocuses());
 	}
 
 	LPCSTR val_ptr = edit->get_object_item_value(object, effect, item);

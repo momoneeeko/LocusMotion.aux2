@@ -99,6 +99,8 @@ HRESULT CreateDeviceResources(HWND hwnd) {
 			LoadSvgFromResource(hInst, IDR_SVG_TURN);
 			LoadSvgFromResource(hInst, IDR_SVG_RETURN);
 			LoadSvgFromResource(hInst, IDR_SVG_EFFECTHIDE);
+			LoadSvgFromResource(hInst, IDR_SVG_CHECK);
+			LoadSvgFromResource(hInst, IDR_SVG_DELETE);
 		}
 	}
 	return hr;
