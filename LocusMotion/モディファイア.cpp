@@ -137,7 +137,6 @@ bool MODIFIER::UpdataParam(D2D1_RECT_F Rect, CUR_MOD* Cursor) {
 				AppendMenuW(hMenu, MF_STRING, 103, L"フレーム");
 				AppendMenuW(hMenu, MF_STRING, 104, L"FPS");
 				AppendMenuW(hMenu, MF_STRING, 105, L"BPM");
-				AppendMenuW(hMenu, MF_STRING, 106, L"BPM参照");
 
 				POINT pt = { (LONG)ParamIntervalUnit.left, (LONG)ParamIntervalUnit.bottom };
 				if (Cursor->hwnd && IsWindow(Cursor->hwnd)) {
@@ -179,11 +178,6 @@ bool MODIFIER::UpdataParam(D2D1_RECT_F Rect, CUR_MOD* Cursor) {
 					Param[1] = 4.0;
 					break;
 				}
-				case 106: {
-					Param[0] = ChengeUnit(Param[1], 5, Param[0]);
-					Param[1] = 5.0;
-					break;
-				}
 				}
 			}
 			Cursor->x = 0.0f;
@@ -207,7 +201,6 @@ bool MODIFIER::UpdataParam(D2D1_RECT_F Rect, CUR_MOD* Cursor) {
 				AppendMenuW(hMenu, MF_STRING, 101, L"秒");
 				AppendMenuW(hMenu, MF_STRING, 102, L"ミリ秒");
 				AppendMenuW(hMenu, MF_STRING, 103, L"フレーム");
-				AppendMenuW(hMenu, MF_STRING, 104, L"BPM参照");
 
 				POINT pt = { (LONG)ParamTimeUnit.left, (LONG)ParamTimeUnit.bottom };
 				if (Cursor->hwnd && IsWindow(Cursor->hwnd)) {
@@ -237,11 +230,6 @@ bool MODIFIER::UpdataParam(D2D1_RECT_F Rect, CUR_MOD* Cursor) {
 				case 103: {
 					Param[2] = ChengeUnit(Param[3], 2, Param[2]);
 					Param[3] = 2.0;
-					break;
-				}
-				case 104: {
-					Param[2] = ChengeUnit(Param[3], 5, Param[2]);
-					Param[3] = 3.0;
 					break;
 				}
 				}

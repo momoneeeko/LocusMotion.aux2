@@ -230,8 +230,9 @@ double LOCUS::LocusToValue(double Time, int n) {
 // ・ループ (0~1を(回数)繰り返す)
 // ・反転ループ (0~1,1~0を(回数)繰り返す)
 // ・段々ループ
-// ・速度を取得 (曲線の傾きを取得)
+// ☆速度を取得 (曲線の傾きを取得)
 // ・波を合成 (正弦波やランダムなどを合成)
+// ・ディレイ
 
 double LOCUSES::LocusesToValue(double Time, int n) {
     double out = 0.0f;
