@@ -424,6 +424,7 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 	}
 
 	if (Cursor->rclick && Cursor->RangeCheck(L"LocusEditor")) {
+		Cursor->rclick = false;
 		HMENU hMenu = CreatePopupMenu();
 		if (hMenu) {
 			AppendMenuW(hMenu, MF_STRING, 101, L"”½“]");
@@ -466,7 +467,7 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 			case 102:
 			{
 				std::reverse(Locus.begin(), Locus.end());
-				SelectLocus = Locus.size() - 1 - SelectLocus;
+				SelectLocus = (int)Locus.size() - 1 - SelectLocus;
 				for (int i = 0; i < Locus.size(); i++) {
 					POS NewS = { 1.0f - Locus[i].Locus[Locus[i].Mode].F.x, 1.0f - Locus[i].Locus[Locus[i].Mode].F.y };
 					POS NewF = { 1.0f - Locus[i].Locus[Locus[i].Mode].S.x, 1.0f - Locus[i].Locus[Locus[i].Mode].S.y };
@@ -553,6 +554,8 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 				break;
 			}
 			}
+			Cursor->x = 0.0f;
+			Cursor->y = 0.0f;
 		}
 	}
 
@@ -560,7 +563,8 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 	D2D1_RECT_F Rect = Cursor->range.Range[L"Locus"];
 	D2D1_RECT_F Lrect = D2D1::RectF(Rect.left + 30.0f, Rect.top + 30.0f + 40.0f, Rect.right - 30.0f, Rect.bottom - 30.0f);
 
-	float Size = (std::min)(std::abs(Lrect.right - Lrect.left), std::abs(Lrect.bottom - Lrect.top)) / 2.0f;
+	float Size = (std::max)((std::min)(std::abs(Lrect.right - Lrect.left), std::abs(Lrect.bottom - Lrect.top)) / 2.0f, 0.01f);
+	Size = (std::max)(Size, 10.0f);
 	if (Cursor->wheel > 0.0f && Cursor->RangeCheck(L"Locus")) {
 		if (sizeF < 10.0f) {
 			sizeF *= 1.1f * Cursor->wheel;
@@ -582,14 +586,14 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 
 	if (Cursor->mclick && Cursor->RangeCheck(L"LocusEditor")) {
 		Mclicking = true;
-		SetCursor(LoadCursor(NULL, IDC_SIZEALL));
+	}
+	if (!Cursor->mclicking) {
+		Mclicking = false;
 	}
 	if (Mclicking) {
-		xF = (std::min)((std::max)(xF + Cursor->move.x / Size, -1.0f), 1.0f);
-		yF += Cursor->move.y / Size;
-		if (!Cursor->mclicking) {
-			Mclicking = false;
-			SetCursor(LoadCursor(NULL, IDC_ARROW));
+		if (Size > 0.0f) {
+			xF = (std::min)((std::max)(xF + Cursor->move.x / Size, -1.0f), 1.0f);
+			yF += Cursor->move.y / Size;
 		}
 	}
 	x += (xF - x) / 2.0f;
@@ -704,7 +708,8 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 	}
 
 	D2D1_RECT_F ModeRect = D2D1::RectF(Rect.left + 10.0f, Rect.top + 6.0f, Rect.right - 10.0f - 44.0f, Rect.top + 40.0f);
-	if (Cursor->click && Cursor->RectCheck(ModeRect)) {
+	ModeMenuHover = Cursor->RectCheck(ModeRect);
+	if (Cursor->click && ModeMenuHover) {
 		ModeMenuClicking = true;
 	}
 	if (!Cursor->clicking && ModeMenuClicking) {
@@ -726,7 +731,8 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 	}
 
 	D2D1_RECT_F TurnRect = D2D1::RectF(Rect.right - 10.0f - 34.0f, Rect.top + 6.0f, Rect.right - 10.0f, Rect.top + 40.0f);
-	if (Cursor->RectCheck(TurnRect)) {
+	TurnHover = Cursor->RectCheck(TurnRect);
+	if (TurnHover) {
 		if (Cursor->click) {
 			Locus[SelectLocus].Locus[Locus[SelectLocus].Mode].Turn = (bool)(((int)Locus[SelectLocus].Locus[Locus[SelectLocus].Mode].Turn + 1) % 2);
 			Locus[SelectLocus].UpdateLocus = true;
@@ -751,7 +757,8 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 	else {
 		ReturnSizeHide = true;
 	}
-	if (Cursor->RectCheck(ReturnSizeRect)) {
+	ReturnSizeHover = Cursor->RectCheck(ReturnSizeRect);
+	if (ReturnSizeHover) {
 		if (Cursor->click && !ReturnSizeHide) {
 			sizeF = 1.0f;
 			xF = 0.0f;
@@ -792,11 +799,12 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 	return Return;
 }
 
-void EDITOR::Draw(CUR Cursor) {
-	D2D1_RECT_F Rect = Cursor.range.Range[L"Locus"];
+void EDITOR::Draw(CUR *Cursor) {
+	D2D1_RECT_F Rect = Cursor->range.Range[L"Locus"];
 	D2D1_RECT_F Lrect = D2D1::RectF(Rect.left + 30.0f, Rect.top + 30.0f + 40.0f, Rect.right - 30.0f, Rect.bottom - 30.0f);
 
 	float Size = (std::min)(std::abs(Lrect.right - Lrect.left), std::abs(Lrect.bottom - Lrect.top)) / 2.0f;
+	Size = (std::max)(Size, 10.0f);
 	Size *= size;
 	D2D1_POINT_2F Center = D2D1::Point2(
 		(Lrect.left + Lrect.right) / 2.0f + (x * Size),

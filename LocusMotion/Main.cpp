@@ -22,7 +22,7 @@ HCURSOR hDragCursor = NULL;
 //---------------------------------------------------------------------
 COMMON_PLUGIN_TABLE common_plugin_table = {
 	L"LocusMotion",								// プラグインの名前
-	L"LocusMotion β1.0 もも猫(@momo_neeeko)",		// プラグインの情報
+	L"LocusMotion β3.0 もも猫(@momo_neeeko)",		// プラグインの情報
 };
 
 //---------------------------------------------------------------------
@@ -86,6 +86,34 @@ void OnEvent(void* param) {
 	HWND hwnd = (HWND)param;
 	Effects.GetObjectEffects();
 	WindowResize = true;
+}
+
+void UpdateCursorShape(HWND hwnd, const CUR& cursor, const EDITOR& Editor, const P_Effects& Effects) {
+	// マウスカーソルの現在位置（スクリーン座標）を取得
+	POINT pt;
+	GetCursorPos(&pt);
+
+	// 自ウィンドウ上、またはマウスキャプチャ中のみカーソルを変更する
+	if (GetCapture() == hwnd || WindowFromPoint(pt) == hwnd) {
+		if (cursor.drag) {
+			SetCursor(hDragCursor); //ドラッグ
+		}
+		else if (Editor.Mclicking) {
+			SetCursor(LoadCursor(NULL, IDC_SIZEALL)); //視点移動
+		}
+		else if (Effects.RatioHover || Effects.RatioClicking) {
+			SetCursor(LoadCursor(NULL, (cursor.range.Type == 0) ? IDC_SIZENS : IDC_SIZEWE)); //エフェクト一覧割合
+		}
+		else if ((Editor.ReturnSizeHover && !Editor.ReturnSizeHide) || Editor.TurnHover || Editor.ModeMenuHover || Editor.ModeMenuClicking) {
+			SetCursor(LoadCursor(NULL, IDC_HAND)); //エディタUIホバー
+		}
+		else if (Effects.HideButtonHover) {
+			SetCursor(LoadCursor(NULL, IDC_HAND)); //エフェクト一覧UIホバー
+		}
+		else {
+			SetCursor(LoadCursor(NULL, IDC_ARROW)); //デフォルト
+		}
+	}
 }
 
 LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) {
@@ -176,8 +204,8 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 			COLORREF bgColor = (config && config->get_color_code) ? config->get_color_code(config, "Background") : 0x202020;
 			g_pRenderTarget->Clear(D2D1::ColorF(bgColor));
 
-			Editor.Draw(cursor);
-			Effects.Draw(cursor);
+			Editor.Draw(&cursor);
+			Effects.Draw(&cursor);
 
 			HRESULT hr = g_pRenderTarget->EndDraw();
 			if (hr == D2DERR_RECREATE_TARGET) {
@@ -188,16 +216,18 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		return 0;
 	}
 	case WM_TIMER: {
-		cursor.range.Update(D2D1::RectF(0.0f, 0.0f, (float)WinWidth, (float)WinHeight), Effects.HideAnime);
+		cursor.range.Update(D2D1::RectF(0.0f, 0.0f, (float)WinWidth, (float)WinHeight), (1.0f - Effects.DisplayRatio * (1.0f - Effects.HideAnime)));
 		cursor.move = D2D1::Point2(cursor.x - BeforCursor.x, cursor.y - BeforCursor.y);
 		BeforCursor = D2D1::Point2(cursor.x, cursor.y);
 		if (cursor.action || Editor.AnimeMoving || Effects.AnimeMoving || WindowResize) {
 			bool LocusRedraw = Editor.Update(&cursor, WindowResize);
-			bool EffectRedraw = Effects.Update(cursor);
+			bool EffectRedraw = Effects.Update(&cursor);
 			if (LocusRedraw || EffectRedraw) {
 				InvalidateRect(hwnd, NULL, FALSE);
 			}
+			UpdateCursorShape(hwnd, cursor, Editor, Effects);
 		}
+
 		WindowResize = false;
 		cursor.action = false;
 
@@ -210,13 +240,6 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		cursor.moveing = false;
 		cursor.drop = false;
 		cursor.wheel = 0.0f;
-		if (!cursor.clicking && cursor.drag) {
-			cursor.drag = false;
-			SetCursor(LoadCursor(NULL, IDC_ARROW));
-		}
-		if (cursor.drag) {
-			SetCursor(hDragCursor);
-		}
 		break;
 	}
 	case WM_MOUSEMOVE: {
@@ -289,6 +312,13 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		cursor.wheel = (std::min)((std::max)(cursor.wheel + (float)(delta / 120), -1.5f), 1.5f);
 		break;
 	}
+	case WM_SETCURSOR: {
+		if (LOWORD(lparam) == HTCLIENT) {
+			UpdateCursorShape(hwnd, cursor, Editor, Effects);
+			return TRUE;
+		}
+		break;
+	}
 	case WM_GETMINMAXINFO: {
 		LPMINMAXINFO mmi = (LPMINMAXINFO)lparam;
 		mmi->ptMinTrackSize.x = 500;
@@ -304,7 +334,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 }
 
 //---------------------------------------------------------------------
-//	GetLocus関数 (スクリプトモジュール)
+//	スクリプトモジュール
 //---------------------------------------------------------------------
 void GetLocus(SCRIPT_MODULE_PARAM* param) {
 	int LocusID = param->get_param_int(0);
@@ -333,7 +363,7 @@ SCRIPT_MODULE_FUNCTION functions[] = {
 };
 
 SCRIPT_MODULE_TABLE script_module_table = {
-	L"LocusMotion ScriptModule By もも猫",
+	L"LocusMotion β3.0 もも猫(@momo_neeeko)",
 	functions
 };
 
@@ -437,9 +467,8 @@ void OnProjectLoad(PROJECT_FILE* project) {
 						size_t paramCount = 0;
 						if (!(iss >> mode >> paramCount)) break;
 
-						// 正しいModeでコンストラクタを呼び出し、ParamHoverやParamHoverAnimeを確保させる
 						MODIFIER modifier(mode);
-						modifier.Param.clear(); // デフォルト値を破棄して保存データで上書き
+						modifier.Param.clear();
 
 						for (size_t p = 0; p < paramCount; ++p) {
 							double val = 0.0;
@@ -459,7 +488,7 @@ void OnProjectLoad(PROJECT_FILE* project) {
 }
 
 //---------------------------------------------------------------------
-//  右クリックメニュー「エディタの曲線を適用」コールバック関数
+//  右クリックメニュー"エディタの曲線を適用"コールバック関数
 //---------------------------------------------------------------------
 void ProcApplyEditorLocusItemMenu(EDIT_SECTION* edit, OBJECT_HANDLE object, LPCWSTR effect, LPCWSTR item) {
 	if (!edit || !object || !effect || !item) return;

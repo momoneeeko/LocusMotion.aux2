@@ -227,7 +227,7 @@ double LOCUS::LocusToValue(double Time, int n) {
 // ☆コマ落ち
 // ☆離散化
 // ・直線化 (一定間隔で直線にする)
-// ・ループ (0~1を(回数)繰り返す)
+// ☆ループ (0~1を(回数)繰り返す)
 // ・反転ループ (0~1,1~0を(回数)繰り返す)
 // ・段々ループ
 // ☆速度を取得 (曲線の傾きを取得)
@@ -260,9 +260,14 @@ double LOCUSES::PlayModifier(double x, double Time, double framerate, int n) {
         switch (Modifier[i].Mode) {
         case 1: {   //コマ落ち
             double v = Modifier[i].ChengeUnit((int)Modifier[i].Param[1], 0, Modifier[i].Param[0]); //間隔
-            double p = Modifier[i].ChengeUnit((int)Modifier[i].Param[3], 0, Modifier[i].Param[2]);
-            t = floor(x * (Time / v) - p) / (Time / v) + p;
+            double p = Modifier[i].ChengeUnit((int)Modifier[i].Param[3], 0, Modifier[i].Param[2]); //開始位置
+            t = (floor((x * Time - p) / v) * v + p) / Time;
             break;
+        }
+        case 4: {
+            if (t != 1.0) {
+                t = fmod(x * Modifier[i].Param[0], 1.0);
+            }
         }
         }
     }

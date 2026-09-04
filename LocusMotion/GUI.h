@@ -62,8 +62,17 @@ struct MODIFIER {
 			}
 			break;
 		}
-		case 3: {
+		case 3: {	//速度化
 			Param.push_back(1.0);	// 増分
+			for (int i = 0; i < 1; i++) {
+				ParamHover.push_back(false);
+				ParamHoverAnime.push_back(0.0f);
+				ParamUse.push_back(false);
+			}
+			break;
+		}
+		case 4: {	//ループ
+			Param.push_back(5.0);	// 回数
 			for (int i = 0; i < 1; i++) {
 				ParamHover.push_back(false);
 				ParamHoverAnime.push_back(0.0f);
@@ -162,19 +171,24 @@ extern LOCUSDATA LocusData;
 
 struct RANGE {
 	std::map<std::wstring,D2D1_RECT_F> Range;
+	int Type = 0;		//0=縦長, 1=横長
 
-	void Update(D2D1_RECT_F Window, float HideAnime) {
+	void Update(D2D1_RECT_F Window, float DisplayRatio) {
 		float Width = (Window.right - Window.left);
 		float Height = (Window.bottom - Window.top);
 		if (Width < Height) {
-			Range[L"EffectsList"] = D2D1::RectF(0.0f, (Height - 30.0f) / (1.0f + (1.0f - HideAnime)), Width, Height - 30.0f);
+			Type = 0;
+			Range[L"EffectsList"] = D2D1::RectF(0.0f, (Height - 30.0f) * DisplayRatio + 5.0f, Width, Height - 30.0f);
 			Range[L"EffectsListHide"] = D2D1::RectF(Range[L"EffectsList"].left, Range[L"EffectsList"].bottom, Range[L"EffectsList"].right, Range[L"EffectsList"].bottom + 30.0f);
-			Range[L"Locus"] = D2D1::RectF(0.0f, 0.0f, Width, (Height - 30.0f) / (1.0f + (1.0f - HideAnime)));
+			Range[L"EffectsListRatio"] = D2D1::RectF(Range[L"EffectsList"].left, Range[L"EffectsList"].top - 5.0f, Range[L"EffectsList"].right, Range[L"EffectsList"].top);
+			Range[L"Locus"] = D2D1::RectF(0.0f, 0.0f, Width, (Height - 30.0f) * DisplayRatio);
 		}
 		else {
-			Range[L"EffectsList"] = D2D1::RectF((Width - 30.0f) / (1.0f + (1.0f - HideAnime)), 0.0f, Width - 30.0f, Height);
+			Type = 1;
+			Range[L"EffectsList"] = D2D1::RectF((Width - 30.0f) * DisplayRatio + 5.0f, 0.0f, Width - 30.0f, Height);
 			Range[L"EffectsListHide"] = D2D1::RectF(Range[L"EffectsList"].right, Range[L"EffectsList"].top, Range[L"EffectsList"].right + 30.0f, Range[L"EffectsList"].bottom);
-			Range[L"Locus"] = D2D1::RectF(0.0f, 0.0f, (Width - 30.0f) / (1.0f + (1.0f - HideAnime)), Height);
+			Range[L"EffectsListRatio"] = D2D1::RectF(Range[L"EffectsList"].left - 5.0f, Range[L"EffectsList"].top, Range[L"EffectsList"].left, Range[L"EffectsList"].bottom);
+			Range[L"Locus"] = D2D1::RectF(0.0f, 0.0f, (Width - 30.0f) * DisplayRatio, Height);
 		}
 		Range[L"LocusEditor"] = D2D1::RectF(Range[L"Locus"].left, Range[L"Locus"].top + 40.0f, Range[L"Locus"].right, Range[L"Locus"].bottom);
 		Range[L"LocusMenu"] = D2D1::RectF(Range[L"Locus"].left + 10.0f, Range[L"Locus"].top + 6.0f, Range[L"Locus"].right - 10.0f - 44.0f, Range[L"Locus"].top + 40.0f);
@@ -270,16 +284,19 @@ public:
 	LOCUS CopyLocus;
 	//UI関連
 	bool AnimeMoving = false;
+	bool ModeMenuHover = false;
 	bool ModeMenuClicking = false;
 	float ModeMenuAnime = 1.0f;
+	bool TurnHover = false;
 	float TurnHoverAnime = 1.0f;
 	bool ReturnSizeHide = true;
 	float ReturnSizeHideAnime = 0.0f;
+	bool ReturnSizeHover = false;
 	float ReturnSizeHoverAnime = 0.0f;
 
 	void GridDraw(D2D1_RECT_F Rect, float Size, D2D1_POINT_2F Center, int Grid);
-	bool Update(CUR* Cursor, bool LocusUpdate);
-	void Draw(CUR Cursor);
+	bool Update(CUR *Cursor, bool LocusUpdate);
+	void Draw(CUR *Cursor);
 	LOCUSES ToLocuses();
 	void SetLocuses(LOCUSES locuses);
 };
@@ -326,8 +343,8 @@ public:
 	}
 
 	void UpdateGeometry(LOCUSES Locus, D2D1_RECT_F Rect, int Section, float normS, float normE) const;
-	bool Update(D2D1_RECT_F rect, CUR Cursor) const;
-	bool Locus_Update(D2D1_RECT_F Rect, CUR Cursor) const;
+	bool Update(D2D1_RECT_F rect, CUR *Cursor) const;
+	bool Locus_Update(D2D1_RECT_F Rect, CUR *Cursor) const;
 	void Draw(D2D1_RECT_F Rect, CUR* Cursor) const;
 	void Locus_Draw(D2D1_RECT_F Rect, CUR* Cursor) const;
 	void SetTrackbar(int LocusID) const;
@@ -346,9 +363,9 @@ public:
 
 	int CopyID = -1;
 	CLOCUS CopyCLocus;
-	bool UseCopyCLocus;
+	bool UseCopyCLocus = false;
 	LOCUSES CopyLocuses;
-	bool UseCopyLocuses;
+	bool UseCopyLocuses = false;
 
 	float YRange = 0;
 
@@ -357,9 +374,14 @@ public:
 	bool HideButtonHover = false;
 	float HideButtonHoverAnime = 0.0f;
 
+	float DisplayRatio = 0.5f;		//エディタとエフェクト一覧の割合
+	bool RatioHover = false;
+	float RatioHoverAnime = 0.0f;
+	bool RatioClicking = false;
+
 	void GetObjectEffects();
-	bool Update(CUR Cursor);
-	void Draw(CUR Cursor);
+	bool Update(CUR *Cursor);
+	void Draw(CUR *Cursor);
 };
 
 extern EDITOR Editor;

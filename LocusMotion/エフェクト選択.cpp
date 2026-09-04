@@ -21,7 +21,7 @@ int randomInt(int min, int max)
 
 #define PI 3.14159265359f
 
-bool P_Effect::Locus_Update(D2D1_RECT_F Rect, CUR Cursor) const {
+bool P_Effect::Locus_Update(D2D1_RECT_F Rect, CUR *Cursor) const {
 	bool Return = false;
 	if (LocusID < 0 || LocusID >= static_cast<int>(LocusData.CLocus.size())) {
 		return false;
@@ -48,24 +48,24 @@ bool P_Effect::Locus_Update(D2D1_RECT_F Rect, CUR Cursor) const {
 	}
 	XRange = (std::max)(XRange - (Rect.right - Rect.left), 0.0f);
 
-	if (Cursor.click && Cursor.RectCheck(Rect)) {
+	if (Cursor->click && Cursor->RectCheck(Rect)) {
 		click = true;
 	}
-	if (Cursor.clicking && !Cursor.click && Cursor.move.x != 0.0f) {
-		if (Cursor.RectCheck(Rect) && click) {
+	if (Cursor->clicking && !Cursor->click && Cursor->move.x != 0.0f) {
+		if (Cursor->RectCheck(Rect) && click) {
 			drag = true;
 		}
 		if (drag) {
-			PageXF -= Cursor.move.x;
+			PageXF -= Cursor->move.x;
 			PageXF = (std::min)((std::max)(PageXF, 0.0f), XRange);
 		}
 	}
-	if (Cursor.RectCheck(Rect)) {
-		if (Cursor.wheel < 0 && GetAsyncKeyState(VK_SHIFT) & 0x8000) {
-			PageXF += 50 * abs(Cursor.wheel);
+	if (Cursor->RectCheck(Rect)) {
+		if (Cursor->wheel < 0 && GetAsyncKeyState(VK_SHIFT) & 0x8000) {
+			PageXF += 50 * abs(Cursor->wheel);
 		}
-		if (Cursor.wheel > 0 && GetAsyncKeyState(VK_SHIFT) & 0x8000) {
-			PageXF -= 50 * abs(Cursor.wheel);
+		if (Cursor->wheel > 0 && GetAsyncKeyState(VK_SHIFT) & 0x8000) {
+			PageXF -= 50 * abs(Cursor->wheel);
 		}
 		PageXF = (std::min)((std::max)(PageXF, 0.0f), XRange);
 	}
@@ -83,7 +83,7 @@ bool P_Effect::Locus_Update(D2D1_RECT_F Rect, CUR Cursor) const {
 	for (int i = 0; i < SectionNum; i++) {
 		D2D1_RECT_F LocusRect = D2D1::RectF(left, Rect.top, left + width[i], Rect.bottom - 20.0f);
 
-		LocusHover[i] = Cursor.RectCheck(LocusRect);
+		LocusHover[i] = Cursor->RectCheck(LocusRect);
 		float target = LocusHover[i] ? 1.0f : 0.0f;
 		LocusHoverAnime[i] += (target - LocusHoverAnime[i]) / 2.0f;
 
@@ -91,19 +91,20 @@ bool P_Effect::Locus_Update(D2D1_RECT_F Rect, CUR Cursor) const {
 			LocusHoverAnime[i] = target;
 		}
 
-		if (Cursor.drop && LocusHover[i]) {
+		if (Cursor->drop && LocusHover[i]) {
 			LocusData.CLocus[LocusID].Locuses[i].LoadLocuses(Editor.ToLocuses());
 			Return = true;
 		}
 
-		if (click && !drag && !Cursor.clicking && LocusHover[i]) {
+		if (click && !drag && !Cursor->clicking && LocusHover[i]) {
 			Editor.SetLocuses(LocusData.CLocus[LocusID].Locuses[i]);
 			click = false;
 			drag = false;
 			Return = true;
 		}
 
-		if (Cursor.rclick && LocusHover[i]) {
+		if (Cursor->rclick && LocusHover[i]) {
+			Cursor->rclick = false;
 			HMENU hMenu = CreatePopupMenu();
 			if (hMenu) {
 				AppendMenuW(hMenu, MF_STRING, 104, L"エディタの曲線を適用");
@@ -119,15 +120,15 @@ bool P_Effect::Locus_Update(D2D1_RECT_F Rect, CUR Cursor) const {
 				AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
 				AppendMenuW(hMenu, MF_STRING, 105, L"モディファイア");
 
-				POINT pt = { (LONG)Cursor.x, (LONG)Cursor.y };
-				ClientToScreen(Cursor.hwnd, &pt);
+				POINT pt = { (LONG)Cursor->x, (LONG)Cursor->y };
+				ClientToScreen(Cursor->hwnd, &pt);
 
-				SetForegroundWindow(Cursor.hwnd);
+				SetForegroundWindow(Cursor->hwnd);
 				int cmd = TrackPopupMenu(
 					hMenu,
 					TPM_RIGHTBUTTON | TPM_RETURNCMD,
 					pt.x, pt.y,
-					0, Cursor.hwnd, NULL
+					0, Cursor->hwnd, NULL
 				);
 				DestroyMenu(hMenu);
 
@@ -177,12 +178,14 @@ bool P_Effect::Locus_Update(D2D1_RECT_F Rect, CUR Cursor) const {
 				}
 				case 105: {
 					// LocusData.CLocus[LocusID].Locuses[i] の参照を直接渡す
-					if (ModifierWindow(Cursor.hwnd, L"モディファイア", Cursor, LocusData.CLocus[LocusID].Locuses[i])) {
+					if (ModifierWindow(Cursor->hwnd, L"モディファイア", *Cursor, LocusData.CLocus[LocusID].Locuses[i])) {
 						Return = true;
 					}
 					break;
 				}
 				}
+				Cursor->x = 0.0f;
+				Cursor->y = 0.0f;
 			}
 		}
 		if (LocusHoverAnime[i] != target) {
@@ -190,10 +193,10 @@ bool P_Effect::Locus_Update(D2D1_RECT_F Rect, CUR Cursor) const {
 		}
 		left += width[i];
 	}
-	if (!Cursor.clicking) {
+	if (!Cursor->clicking) {
 		click = false;
 	}
-	if (drag && !Cursor.clicking) {
+	if (drag && !Cursor->clicking) {
 		drag = false;
 	}
 	return Return;
@@ -449,11 +452,11 @@ void P_Effect::ChangeIDTrackbar(int NewLocusID) const {
 	}
 }
 
-bool P_Effect::Update(D2D1_RECT_F Rect, CUR Cursor) const {
+bool P_Effect::Update(D2D1_RECT_F Rect, CUR *Cursor) const {
 	bool Return = false;
-	Hover = Cursor.RectCheck(Rect) && Cursor.RangeCheck(L"EffectsList");
+	Hover = Cursor->RectCheck(Rect) && Cursor->RangeCheck(L"EffectsList");
 
-	if (Cursor.drop && Hover && Tipe == L"項目") {
+	if (Cursor->drop && Hover && Tipe == L"項目") {
 		if (Use) {
 			LocusData.SetAllLocuses(LocusID, Editor.ToLocuses());
 		}
@@ -466,73 +469,80 @@ bool P_Effect::Update(D2D1_RECT_F Rect, CUR Cursor) const {
 		Return = true;
 	}
 
-	if (Cursor.RangeCheck(L"EffectsList")) {
-		if (Hover && (Cursor.click || Cursor.rclick)) {
+	if (Cursor->RangeCheck(L"EffectsList")) {
+		if (Hover && (Cursor->click)) {
 			if (Tipe == L"エフェクト" || Use) {
+				Cursor->click = false;
 				Open = (Open + 1) % 2;
 			}
-			else {
-				if (Tipe == L"項目" && !Use && !UseElse) {
-					HMENU hMenu = CreatePopupMenu();
-					if (hMenu) {
-						AppendMenuW(hMenu, MF_STRING, 101, L"新規作成");
-						AppendMenuW(hMenu, MF_STRING, 102, L"エディタの曲線を適用");
-						AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
-						if (Effects.CopyID == -1) {
-							AppendMenuW(hMenu, MF_STRING | MF_GRAYED, 103, L"貼り付け");
-						}
-						else {
-							AppendMenuW(hMenu, MF_STRING, 103, L"貼り付け");
-						}
-
-						POINT pt = { (LONG)Cursor.x, (LONG)Cursor.y };
-						ClientToScreen(Cursor.hwnd, &pt);
-
-						SetForegroundWindow(Cursor.hwnd);
-						int cmd = TrackPopupMenu(
-							hMenu,
-							TPM_RIGHTBUTTON | TPM_RETURNCMD,
-							pt.x, pt.y,
-							0, Cursor.hwnd, NULL
-						);
-						DestroyMenu(hMenu);
-
-						switch (cmd) {
-						case 101:
-						{
-							int new_id = LocusData.NewCLocus(SectionNum);
-							SetTrackbar(new_id);
-
-							Use = true;
-							Open = true;
-							Return = true;
-							break;
-						}
-						case 102:
-						{
-							int new_id = LocusData.NewSetLocuses(SectionNum, Editor.ToLocuses());
-							SetTrackbar(new_id);
-
-							Use = true;
-							Open = true;
-							Return = true;
-							break;
-						}
-						case 103:
-						{
-							SetTrackbar(Effects.CopyID);
-							Use = true;
-							Return = true;
-							break;
-						}
-						}
+		}
+		if (Hover && (Cursor->click || Cursor->rclick)) {
+			if (Tipe == L"項目" && !Use && !UseElse) {
+				Cursor->click = false;
+				Cursor->rclick = false;
+				HMENU hMenu = CreatePopupMenu();
+				if (hMenu) {
+					AppendMenuW(hMenu, MF_STRING, 101, L"新規作成");
+					AppendMenuW(hMenu, MF_STRING, 102, L"エディタの曲線を適用");
+					AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+					if (Effects.CopyID == -1) {
+						AppendMenuW(hMenu, MF_STRING | MF_GRAYED, 103, L"貼り付け");
 					}
+					else {
+						AppendMenuW(hMenu, MF_STRING, 103, L"貼り付け");
+					}
+
+					POINT pt = { (LONG)Cursor->x, (LONG)Cursor->y };
+					ClientToScreen(Cursor->hwnd, &pt);
+
+					SetForegroundWindow(Cursor->hwnd);
+					int cmd = TrackPopupMenu(
+						hMenu,
+						TPM_RIGHTBUTTON | TPM_RETURNCMD,
+						pt.x, pt.y,
+						0, Cursor->hwnd, NULL
+					);
+					DestroyMenu(hMenu);
+
+					switch (cmd) {
+					case 101:
+					{
+						int new_id = LocusData.NewCLocus(SectionNum);
+						SetTrackbar(new_id);
+
+						Use = true;
+						Open = true;
+						Return = true;
+						break;
+					}
+					case 102:
+					{
+						int new_id = LocusData.NewSetLocuses(SectionNum, Editor.ToLocuses());
+						SetTrackbar(new_id);
+
+						Use = true;
+						Open = true;
+						Return = true;
+						break;
+					}
+					case 103:
+					{
+						SetTrackbar(Effects.CopyID);
+						Use = true;
+						Return = true;
+						break;
+					}
+					}
+					Cursor->x = 0.0f;
+					Cursor->y = 0.0f;
 				}
 			}
 			Return = true;
 		}
 
-		if (Hover && Cursor.rclick && Tipe == L"項目" && Use) {
+		if (Hover && Cursor->rclick && Tipe == L"項目" && Use) {
+			Cursor->click = false;
+			Cursor->rclick = false;
 			HMENU hMenu = CreatePopupMenu();
 			if (hMenu) {
 				AppendMenuW(hMenu, MF_STRING, 101, L"コピー");
@@ -546,15 +556,15 @@ bool P_Effect::Update(D2D1_RECT_F Rect, CUR Cursor) const {
 				AppendMenuW(hMenu, MF_STRING, 103, L"新規IDを作成");
 				AppendMenuW(hMenu, MF_STRING, 104, L"削除");
 
-				POINT pt = { (LONG)Cursor.x, (LONG)Cursor.y };
-				ClientToScreen(Cursor.hwnd, &pt);
+				POINT pt = { (LONG)Cursor->x, (LONG)Cursor->y };
+				ClientToScreen(Cursor->hwnd, &pt);
 
-				SetForegroundWindow(Cursor.hwnd);
+				SetForegroundWindow(Cursor->hwnd);
 				int cmd = TrackPopupMenu(
 					hMenu,
 					TPM_RIGHTBUTTON | TPM_RETURNCMD,
 					pt.x, pt.y,
-					0, Cursor.hwnd, NULL
+					0, Cursor->hwnd, NULL
 				);
 				DestroyMenu(hMenu);
 
@@ -587,6 +597,8 @@ bool P_Effect::Update(D2D1_RECT_F Rect, CUR Cursor) const {
 					break;
 				}
 				}
+				Cursor->x = 0.0f;
+				Cursor->y = 0.0f;
 			}
 		}
 	}
@@ -787,14 +799,41 @@ void P_Effects::GetObjectEffects() {
 		OBJECT_HANDLE object = edit->get_focus_object();
 		if (!object) return;
 
+		std::unordered_map<std::wstring, int> effect_type_map;
+		edit_handle->enum_effect_name(&effect_type_map, [](void* p_data, LPCWSTR name, int type, int flag) {
+			auto p_map = static_cast<std::unordered_map<std::wstring, int>*>(p_data);
+			if (name) {
+				(*p_map)[name] = type;
+			}
+			});
+
 		int effect_count = edit->get_effect_list(object, nullptr, 0);
 		if (effect_count <= 0) return;
 
 		std::vector<EFFECT_HANDLE> effects(effect_count);
 		edit->get_effect_list(object, effects.data(), effect_count);
 
+		bool is_input_object = false;
+		if (effects[0]) {
+			LPCWSTR first_name = edit->get_effect_name(effects[0]);
+			if (first_name) {
+				auto it = effect_type_map.find(first_name);
+				if (it != effect_type_map.end() && it->second == EDIT_HANDLE::EFFECT_TYPE_INPUT) {
+					is_input_object = true;
+				}
+			}
+		}
+
 		for (int i = 0; i < effect_count; ++i) {
-			EFFECT_HANDLE effect_h = effects[i];
+			int eff_i = i;
+			if (is_input_object && effect_count > 1) {
+				if (i == 0)
+					eff_i = 1;
+				else if (i == 1)
+					eff_i = 0;
+			}
+
+			EFFECT_HANDLE effect_h = effects[eff_i];
 			if (!effect_h) continue;
 
 			LPCWSTR effect_name = edit->get_effect_name(effect_h);
@@ -813,7 +852,7 @@ void P_Effects::GetObjectEffects() {
 				effect_item.OpenAnime = it_h->second.OpenAnime;
 			}
 			else {
-				auto it_k = old_key_map.find(effect_item.GetKey(i));
+				auto it_k = old_key_map.find(effect_item.GetKey(eff_i));
 				if (it_k != old_key_map.end()) {
 					effect_item.Open = it_k->second.Open;
 					effect_item.OpenAnime = it_k->second.OpenAnime;
@@ -830,7 +869,7 @@ void P_Effects::GetObjectEffects() {
 				int effect_index;
 				const std::unordered_map<std::wstring, P_Effect>* p_key_map;
 				EDIT_SECTION* edit;
-			} enum_param = { p_out_list, effect_name, effect_h, object, i, &old_key_map, edit };
+			} enum_param = { p_out_list, effect_name, effect_h, object, eff_i, &old_key_map, edit };
 
 			edit_handle->enum_effect_item(effect_name, &enum_param, [](void* p_data, LPCWSTR item_name, int item_type) {
 				auto p_enum = static_cast<EnumParam*>(p_data);
@@ -993,8 +1032,8 @@ void P_Effects::GetObjectEffects() {
 	Effect = result_list;
 }
 
-bool P_Effects::Update(CUR Cursor) {
-	D2D1_RECT_F Rect = Cursor.range.Range[L"EffectsList"];
+bool P_Effects::Update(CUR *Cursor) {
+	D2D1_RECT_F Rect = Cursor->range.Range[L"EffectsList"];
 	bool Return = false;
 	YRange = 0.0;
 	bool EffectOpen = false;
@@ -1016,18 +1055,36 @@ bool P_Effects::Update(CUR Cursor) {
 	}
 	YRange = (std::max)(YRange - (Rect.bottom - Rect.top), 0.0f);
 
-	if (Cursor.RangeCheck(L"EffectsList")) {
-		if (Cursor.wheel > 0 && !(GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
+	if (Cursor->RangeCheck(L"EffectsList")) {
+		if (Cursor->wheel > 0 && !(GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
 			PageYF -= 60.0f;
 		}
-		if (Cursor.wheel < 0 && !(GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
+		if (Cursor->wheel < 0 && !(GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
 			PageYF += 60.0f;
 		}
 	}
-	HideButtonHover = Cursor.RectCheck(Cursor.range.Range[L"EffectsListHide"]);
+	HideButtonHover = Cursor->RectCheck(Cursor->range.Range[L"EffectsListHide"]);
+	RatioHover = Cursor->RectCheck(Cursor->range.Range[L"EffectsListRatio"]);
 
-	if (HideButtonHover && Cursor.click) {
+	if (HideButtonHover && Cursor->click) {
 		Hide = !Hide;
+		Return = true;
+	}
+	if (RatioHover && Cursor->click) {
+		RatioClicking = true;
+		Return = true;
+	}
+	if (RatioClicking) {
+		if (!Cursor->clicking) {
+			RatioClicking = false;
+		}
+		if (Cursor->range.Type == 0) {
+			DisplayRatio -= Cursor->move.y / Cursor->range.Range[L"EffectsList"].bottom;
+		}
+		else {
+			DisplayRatio -= Cursor->move.x / Cursor->range.Range[L"EffectsList"].right;
+		}
+		DisplayRatio = (std::min)((std::max)(DisplayRatio, 0.15f), 0.85f);
 		Return = true;
 	}
 
@@ -1041,6 +1098,10 @@ bool P_Effects::Update(CUR Cursor) {
 	if (abs((float)HideButtonHover - HideButtonHoverAnime) < 0.001) {
 		HideButtonHoverAnime = (float)HideButtonHover;
 	}
+	RatioHoverAnime += ((float)RatioHover - RatioHoverAnime) / 3.0f;
+	if (abs((float)RatioHover - RatioHoverAnime) < 0.001) {
+		RatioHoverAnime = (float)RatioHover;
+	}
 
 	if (Hide) {
 		HideAnime += ((float)Hide - HideAnime) / 2.3f;
@@ -1052,10 +1113,15 @@ bool P_Effects::Update(CUR Cursor) {
 		HideAnime = (float)Hide;
 	}
 
-	float y = 3 - PageY;
+	float y = 5.0f + 3.0f - PageY;
 	bool open = false;
+	bool item = false;
 	for (const auto& e : Effect) {
 		if (e.Tipe == L"エフェクト") {
+			if (item) {
+				y += 8.0f;
+				item = false;
+			}
 			D2D1_RECT_F PEffectRect = D2D1::RectF(Rect.left + 1, Rect.top + y + 1, Rect.right - 5, Rect.top + y + 30 - 1);
 			if (e.Update(PEffectRect, Cursor)) {
 				Return = true;
@@ -1064,6 +1130,7 @@ bool P_Effects::Update(CUR Cursor) {
 			y += 30.0f;
 		}
 		else if ((e.Tipe == L"項目") && (open == true)) {
+			item = true;
 			D2D1_RECT_F PEffectRect = D2D1::RectF(Rect.left + 15 + 1, Rect.top + y + 1, Rect.right - 5, Rect.top + y + 30 - 1);
 			if (e.Update(PEffectRect, Cursor)) {
 				Return = true;
@@ -1071,15 +1138,15 @@ bool P_Effects::Update(CUR Cursor) {
 			y += 30.0f + 100.0f * e.Use * e.Open;
 		}
 	}
-	if (PageY != PageYF || HideButtonHoverAnime != (float)HideButtonHover || HideAnime !=(float)Hide) {
+	if (PageY != PageYF || HideButtonHoverAnime != (float)HideButtonHover || HideAnime !=(float)Hide || RatioHoverAnime != (float)RatioHover) {
 		Return = true;
 	}
 	AnimeMoving = Return;
 	return Return;
 }
 
-void P_Effects::Draw(CUR Cursor) {
-	D2D1_RECT_F Rect = Cursor.range.Range[L"EffectsList"];
+void P_Effects::Draw(CUR *Cursor) {
+	D2D1_RECT_F Rect = Cursor->range.Range[L"EffectsList"];
 
 	g_pRenderTarget->PushAxisAlignedClip(
 		Rect,
@@ -1105,7 +1172,7 @@ void P_Effects::Draw(CUR Cursor) {
 	D2D1_ROUNDED_RECT ScrollRoundedRect = D2D1::RoundedRect(ScrollRect, 2.0f, 2.0f);
 	g_pRenderTarget->FillRoundedRectangle(ScrollRoundedRect, g_pBrush);
 
-	float y = 3 - PageY;
+	float y = 5.0f + 3.0f - PageY;
 	bool open = false;
 	bool item = false;
 	for (const auto& e : Effect) {
@@ -1115,20 +1182,24 @@ void P_Effects::Draw(CUR Cursor) {
 				item = false;
 			}
 			D2D1_RECT_F PEffectRect = D2D1::RectF(Rect.left + 1, Rect.top + y + 1, Rect.right - 10, Rect.top + y + 30 - 1);
-				e.Draw(PEffectRect, &Cursor);
+				e.Draw(PEffectRect, Cursor);
 			open = e.Open;
 			y += 30.0f;
 		}
 		else if ((e.Tipe == L"項目") && (open == true)) {
 			item = true;
 			D2D1_RECT_F PEffectRect = D2D1::RectF(Rect.left + 15 + 1, Rect.top + y + 1, Rect.right - 10, Rect.top + y + 30 - 1);
-				e.Draw(PEffectRect, &Cursor);
+				e.Draw(PEffectRect, Cursor);
 			y += 30.0f + 100.0f * e.Use * e.Open;
 		}
 	}
 	g_pRenderTarget->PopAxisAlignedClip();
 
-	D2D1_RECT_F HideButtonRect = Cursor.range.Range[L"EffectsListHide"];
+	D2D1_RECT_F RatioRect = Cursor->range.Range[L"EffectsListRatio"];
+	g_pBrush->SetColor(D2D1::ColorF(config->get_color_code(config, "BorderFocus"), (std::max)(RatioHoverAnime, (float)RatioClicking)));
+	g_pRenderTarget->FillRectangle(RatioRect, g_pBrush);
+
+	D2D1_RECT_F HideButtonRect = Cursor->range.Range[L"EffectsListHide"];
 	g_pBrush->SetColor(D2D1::ColorF(config->get_color_code(config, "Background")));
 	g_pRenderTarget->FillRectangle(HideButtonRect, g_pBrush);
 	g_pBrush->SetColor(D2D1::ColorF(0xffffff, HideButtonHoverAnime * 0.1f));

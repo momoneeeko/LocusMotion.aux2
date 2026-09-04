@@ -5,27 +5,31 @@
 #include "Dialog.h"
 #include <algorithm>
 #include <string>
+#include <functional>
 
 #include <commctrl.h>
 #pragma comment(lib, "comctl32.lib")
 
-// EDITの入力値を保存して破棄する共通関数
+// EDITの入力値を保存して破棄する共通関数（double対応）
 void SaveAndCloseEdit(HWND hEdit) {
-	if (!IsWindow(hEdit)) return;
+	if (!hEdit || !IsWindow(hEdit)) return;
 
-	double* pVal = reinterpret_cast<double*>(GetPropW(hEdit, L"VALUE_PTR"));
+	// プロパティから double* のポインタを取得
+	double* pVal = static_cast<double*>(GetPropW(hEdit, L"VALUE_PTR"));
+
 	if (pVal) {
-		wchar_t buf[256] = { 0 };
-		GetWindowTextW(hEdit, buf, 256);
-		*pVal = static_cast<double>(_wtof(buf));
+		// WM_KILLFOCUS 等による再帰呼び出し防止のため先にPropを削除
 		RemovePropW(hEdit, L"VALUE_PTR");
-	}
 
-	HWND hParent = GetParent(hEdit);
-	DestroyWindow(hEdit);
+		wchar_t buf[256] = {};
+		GetWindowTextW(hEdit, buf, 256);
 
-	if (hParent && IsWindow(hParent)) {
-		InvalidateRect(hParent, NULL, FALSE);
+		if (buf[0] != L'\0') {
+			// 文字列を double に変換して上書き
+			*pVal = std::wcstod(buf, nullptr);
+		}
+
+		DestroyWindow(hEdit);
 	}
 }
 
@@ -58,13 +62,13 @@ LRESULT CALLBACK EditSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lP
 	return DefSubclassProc(hWnd, uMsg, wParam, lParam);
 }
 
-// EDITコントロール生成関数
+// EDITコントロール生成関数（double* 仕様）
 HWND CreateInPlaceEdit(HWND hParent, D2D1_RECT_F rect, const std::wstring& currentText, UINT controlID, double* pValueTarget = nullptr) {
 	int x = static_cast<int>(rect.left);
 	int y = static_cast<int>(rect.top);
 	int width = static_cast<int>(rect.right - rect.left);
 	int height = static_cast<int>(rect.bottom - rect.top);
-	
+
 	HWND hEdit = CreateWindowExW(
 		0, L"EDIT", currentText.c_str(),
 		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_AUTOHSCROLL | ES_CENTER,
@@ -240,14 +244,13 @@ bool MODIFIER::UpdataParam(D2D1_RECT_F Rect, CUR_MOD* Cursor) {
 			Return = true;
 		}
 
-		// アニメーション進行判定の補正
 		for (int k = 0; k < 4; ++k) {
 			ParamHoverAnime[k] += ((int)ParamHover[k] - ParamHoverAnime[k]) / 1.8f;
 			if (abs(ParamHoverAnime[k] - (int)ParamHover[k]) < 0.001f) {
 				ParamHoverAnime[k] = (float)ParamHover[k];
 			}
 			else {
-				Return = true; // アニメーション移動中なら再描画を要求
+				Return = true;
 			}
 		}
 		break;
@@ -338,7 +341,34 @@ bool MODIFIER::UpdataParam(D2D1_RECT_F Rect, CUR_MOD* Cursor) {
 			Return = true;
 		}
 
-		for (int k = 0; k < 2; ++k) {
+		for (int k = 0; k < 1; ++k) {
+			ParamHoverAnime[k] += ((int)ParamHover[k] - ParamHoverAnime[k]) / 1.8f;
+			if (abs(ParamHoverAnime[k] - (int)ParamHover[k]) < 0.001f) {
+				ParamHoverAnime[k] = (float)ParamHover[k];
+			}
+			else {
+				Return = true;
+			}
+		}
+		break;
+	}
+	case 4: {
+		D2D1_RECT_F ParamInterval = D2D1::RectF(Rect.left + 80.0f, Rect.top + 10.0f, Rect.right - 10.0f, Rect.top + 10.0f + 25.0f);
+
+		ParamHover[0] = Cursor->RectCheck(ParamInterval);
+
+		if (Cursor->click && ParamHover[0]) {
+			HWND hExisting = GetDlgItem(Cursor->hwnd, ID_EDIT_INTERVAL);
+			if (!hExisting) {
+				wchar_t valStr[32];
+				swprintf_s(valStr, L"%.2f", Param[0]);
+				CreateInPlaceEdit(Cursor->hwnd, ParamInterval, valStr, ID_EDIT_INTERVAL, &Param[0]);
+			}
+			Cursor->click = false;
+			Return = true;
+		}
+
+		for (int k = 0; k < 1; ++k) {
 			ParamHoverAnime[k] += ((int)ParamHover[k] - ParamHoverAnime[k]) / 1.8f;
 			if (abs(ParamHoverAnime[k] - (int)ParamHover[k]) < 0.001f) {
 				ParamHoverAnime[k] = (float)ParamHover[k];
@@ -480,6 +510,30 @@ void MODIFIER::PaintParam(ID2D1RenderTarget* pTarget, ID2D1SolidColorBrush* pBru
 
 		break;
 	}
+	case 4: {
+		D2D1_RECT_F ParamInterval = D2D1::RectF(Rect.left + 80.0f, Rect.top + 10.0f, Rect.right - 10.0f, Rect.top + 10.0f + 25.0f);
+
+		pBrush->SetColor(D2D1::ColorF(textC));
+		Draw_Text_Dialog(pTarget, pBrush, D2D1::RectF(Rect.left + 10.0f, ParamInterval.top, ParamInterval.left, ParamInterval.bottom), L"回数", TextAlign::Left);
+
+		D2D1::ColorF Button(normalC);
+		D2D1::ColorF ButtonHover(hoverC);
+		float r = Button.r * (1.0f - ParamHoverAnime[0]) + ButtonHover.r * ParamHoverAnime[0];
+		float g = Button.g * (1.0f - ParamHoverAnime[0]) + ButtonHover.g * ParamHoverAnime[0];
+		float b = Button.b * (1.0f - ParamHoverAnime[0]) + ButtonHover.b * ParamHoverAnime[0];
+		pBrush->SetColor(D2D1::ColorF(r, g, b));
+		pTarget->FillRoundedRectangle(D2D1::RoundedRect(ParamInterval, 2.0f, 2.0f), pBrush);
+
+		pBrush->SetColor(D2D1::ColorF(borderC));
+		pTarget->DrawRoundedRectangle(D2D1::RoundedRect(ParamInterval, 2.0f, 2.0f), pBrush, 1.5f);
+
+		wchar_t valStr[32];
+		swprintf_s(valStr, L"%.2f", Param[0]);
+		pBrush->SetColor(D2D1::ColorF(textC));
+		Draw_Text_Dialog(pTarget, pBrush, ParamInterval, valStr, TextAlign::Center);
+
+		break;
+	}
 	}
 }
 
@@ -488,7 +542,7 @@ struct MODDIALOG {
 	bool AddHover = false;
 	float AddHoverAnime = 0.0f;
 
-	float RangeY[3] = { 80.0f, 80.0f, 45.0f}; //パラメータ1つ35.0f、余白上下合わせて10.0f
+	float RangeY[4] = { 80.0f, 80.0f, 45.0f , 45.0f}; //UIのyサイズ (1項目35.0、余白10.0)
 	float Y = 0.0f;
 	float YF = 0.0f;
 
@@ -502,7 +556,7 @@ bool MODDIALOG::Updata(D2D1_RECT_F Rect, CUR_MOD* Cursor, LOCUSES& targetLocuses
 	for (auto& Mod : Modifiers) {
 		RangeAll += 27.0f + RangeY[Mod.Modifier.Mode - 1] * Mod.OpenAnime;
 	}
-	RangeAll = (std::max)(RangeAll - (Rect.bottom - Rect.top),0.0f);
+	RangeAll = (std::max)(RangeAll - (Rect.bottom - Rect.top), 0.0f);
 
 	YF += (std::min)((std::max)(Cursor->wheel, -1.0f), 1.0f) * -50.0f;
 	YF = (std::min)((std::max)(YF, 0.0f), RangeAll);
@@ -547,14 +601,13 @@ bool MODDIALOG::Updata(D2D1_RECT_F Rect, CUR_MOD* Cursor, LOCUSES& targetLocuses
 			break;
 		}
 
-		// アニメーション進行状態のチェック
 		auto updateAnime = [&](float& current, bool target) {
 			current += ((int)target - current) / 1.8f;
 			if (abs(current - (int)target) < 0.001f) {
 				current = (float)target;
 			}
 			else {
-				Return = true; // 補間中なら再描画を要求
+				Return = true;
 			}
 			};
 
@@ -562,7 +615,6 @@ bool MODDIALOG::Updata(D2D1_RECT_F Rect, CUR_MOD* Cursor, LOCUSES& targetLocuses
 		updateAnime(Mod.DisableHoverAnime, Mod.DisableHover);
 		updateAnime(Mod.DeleteHoverAnime, Mod.DeleteHover);
 
-		// OpenAnimeは補間率が違うため別個処理
 		Mod.OpenAnime += ((int)Mod.Open - Mod.OpenAnime) / 2.0f;
 		if (abs(Mod.OpenAnime - (int)Mod.Open) < 0.001f) {
 			Mod.OpenAnime = (float)Mod.Open;
@@ -575,17 +627,18 @@ bool MODDIALOG::Updata(D2D1_RECT_F Rect, CUR_MOD* Cursor, LOCUSES& targetLocuses
 		D2D1_RECT_F ModMenuParam = D2D1::RectF(ModMenu.left, ModMenu.bottom - RangeY[Mod.Modifier.Mode - 1], ModMenu.right, ModMenu.bottom);
 
 		if (Mod.Modifier.UpdataParam(ModMenuParam, Cursor)) {
-			if (i < static_cast<int>(targetLocuses.Modifier.size())) {
-				targetLocuses.Modifier[i] = Mod.Modifier;
-			}
 			Return = true;
+		}
+
+		// 毎フレーム Mod.Modifier を targetLocuses へ同期
+		if (i < static_cast<int>(targetLocuses.Modifier.size())) {
+			targetLocuses.Modifier[i] = Mod.Modifier;
 		}
 
 		y += 27.0f + RangeY[Mod.Modifier.Mode - 1] * Mod.OpenAnime;
 		i += 1;
 	}
 
-	// 追加ボタンの処理
 	D2D1_RECT_F AddButton = D2D1::RectF(Rect.left + 30.0f, y + 5.0f, Rect.right - 40.0f, y + 30.0f);
 	AddHover = Cursor->RectCheck(AddButton);
 
@@ -606,6 +659,7 @@ bool MODDIALOG::Updata(D2D1_RECT_F Rect, CUR_MOD* Cursor, LOCUSES& targetLocuses
 			AppendMenuW(hMenu, MF_STRING, 101, L"コマ落ち");
 			AppendMenuW(hMenu, MF_STRING, 102, L"離散化");
 			AppendMenuW(hMenu, MF_STRING, 103, L"速度化");
+			AppendMenuW(hMenu, MF_STRING, 104, L"ループ");
 
 			POINT pt = { (LONG)AddButton.left, (LONG)AddButton.bottom };
 			if (Cursor->hwnd && IsWindow(Cursor->hwnd)) {
@@ -658,9 +712,23 @@ bool MODDIALOG::Updata(D2D1_RECT_F Rect, CUR_MOD* Cursor, LOCUSES& targetLocuses
 				Return = true;
 				break;
 			}
+			case 104: {
+				MODIFIER NewModifier(4);
+				MODMENU NewModifierMenu;
+				NewModifierMenu.Open = true;
+				NewModifierMenu.OpenAnime = 1.0f;
+				NewModifierMenu.Modifier = NewModifier;
+				Modifiers.push_back(NewModifierMenu);
+
+				targetLocuses.Modifier.push_back(NewModifier);
+				Return = true;
+				break;
+			}
 			}
 		}
 		Cursor->click = false;
+		Cursor->x = 0.0f;
+		Cursor->y = 0.0f;
 		isShowingMenu = false;
 	}
 
@@ -707,7 +775,7 @@ void MODDIALOG::Paint(ID2D1RenderTarget* pTarget, ID2D1SolidColorBrush* pBrush, 
 		float b = Grouping.b * (1.0f - Mod.HoverAnime) + GroupingHover.b * Mod.HoverAnime;
 		pBrush->SetColor(D2D1::ColorF(r, g, b));
 		pTarget->FillRoundedRectangle(D2D1::RoundedRect(ModName, 4.0f, 4.0f), pBrush);
-		std::wstring Name[3] = { L"コマ落ち", L"離散化", L"速度化"};
+		std::wstring Name[4] = { L"コマ落ち", L"離散化", L"速度化", L"ループ"};
 		pBrush->SetColor(D2D1::ColorF(textC));
 		Draw_Text_Dialog(pTarget, pBrush, D2D1::RectF(ModName.left + 30.0f, ModName.top, ModName.right, ModName.bottom), Name[Mod.Modifier.Mode - 1], TextAlign::Left);
 		D2D1_RECT_F ArrowRect = D2D1::RectF(ModName.left + 5.0f, ModName.top, ModName.left + 25.0f, ModName.bottom);
