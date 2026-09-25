@@ -261,13 +261,23 @@ double LOCUSES::PlayModifier(double x, double Time, double framerate, int n) {
         case 1: {   //コマ落ち
             double v = Modifier[i].ChengeUnit((int)Modifier[i].Param[1], 0, Modifier[i].Param[0]); //間隔
             double p = Modifier[i].ChengeUnit((int)Modifier[i].Param[3], 0, Modifier[i].Param[2]); //開始位置
-            t = (floor((x * Time - p) / v) * v + p) / Time;
+            t = (floor((t * Time - p) / v) * v + p) / Time;
             break;
         }
         case 4: {
             if (t != 1.0) {
                 t = fmod(x * Modifier[i].Param[0], 1.0);
             }
+            break;
+        }
+        case 5: {
+            t = fmod(x * Modifier[i].Param[0], 1.0);
+            t = (t <= 0.5) ? t * 2.0 : 1.0 - (t - 0.5) * 2.0;
+            break;
+        }
+        case 6: {
+            t = fmod(x * Modifier[i].Param[0], 1.0);
+            break;
         }
         }
     }
@@ -301,6 +311,9 @@ double LOCUSES::PlayModifier(double x, double Time, double framerate, int n) {
                 out = (LocusesToValue(t + Modifier[i].Param[0] / 100.0 / 2.0, n) - LocusesToValue(t - Modifier[i].Param[0] / 100.0 / 2.0, n)) / (Modifier[i].Param[0] / 100.0);
             }
             break;
+        }
+        case 6: {
+            out = (out + floor(x * Modifier[i].Param[0])) / Modifier[i].Param[0];
         }
         }
     }

@@ -379,6 +379,60 @@ bool MODIFIER::UpdataParam(D2D1_RECT_F Rect, CUR_MOD* Cursor) {
 		}
 		break;
 	}
+	case 5: {
+		D2D1_RECT_F ParamInterval = D2D1::RectF(Rect.left + 80.0f, Rect.top + 10.0f, Rect.right - 10.0f, Rect.top + 10.0f + 25.0f);
+
+		ParamHover[0] = Cursor->RectCheck(ParamInterval);
+
+		if (Cursor->click && ParamHover[0]) {
+			HWND hExisting = GetDlgItem(Cursor->hwnd, ID_EDIT_INTERVAL);
+			if (!hExisting) {
+				wchar_t valStr[32];
+				swprintf_s(valStr, L"%.2f", Param[0]);
+				CreateInPlaceEdit(Cursor->hwnd, ParamInterval, valStr, ID_EDIT_INTERVAL, &Param[0]);
+			}
+			Cursor->click = false;
+			Return = true;
+		}
+
+		for (int k = 0; k < 1; ++k) {
+			ParamHoverAnime[k] += ((int)ParamHover[k] - ParamHoverAnime[k]) / 1.8f;
+			if (abs(ParamHoverAnime[k] - (int)ParamHover[k]) < 0.001f) {
+				ParamHoverAnime[k] = (float)ParamHover[k];
+			}
+			else {
+				Return = true;
+			}
+		}
+		break;
+	}
+	case 6: {
+		D2D1_RECT_F ParamInterval = D2D1::RectF(Rect.left + 80.0f, Rect.top + 10.0f, Rect.right - 10.0f, Rect.top + 10.0f + 25.0f);
+
+		ParamHover[0] = Cursor->RectCheck(ParamInterval);
+
+		if (Cursor->click && ParamHover[0]) {
+			HWND hExisting = GetDlgItem(Cursor->hwnd, ID_EDIT_INTERVAL);
+			if (!hExisting) {
+				wchar_t valStr[32];
+				swprintf_s(valStr, L"%.0f", Param[0]);
+				CreateInPlaceEdit(Cursor->hwnd, ParamInterval, valStr, ID_EDIT_INTERVAL, &Param[0]);
+			}
+			Cursor->click = false;
+			Return = true;
+		}
+
+		for (int k = 0; k < 1; ++k) {
+			ParamHoverAnime[k] += ((int)ParamHover[k] - ParamHoverAnime[k]) / 1.8f;
+			if (abs(ParamHoverAnime[k] - (int)ParamHover[k]) < 0.001f) {
+				ParamHoverAnime[k] = (float)ParamHover[k];
+			}
+			else {
+				Return = true;
+			}
+		}
+		break;
+	}
 	}
 	return Return;
 }
@@ -534,6 +588,54 @@ void MODIFIER::PaintParam(ID2D1RenderTarget* pTarget, ID2D1SolidColorBrush* pBru
 
 		break;
 	}
+	case 5: {
+		D2D1_RECT_F ParamInterval = D2D1::RectF(Rect.left + 80.0f, Rect.top + 10.0f, Rect.right - 10.0f, Rect.top + 10.0f + 25.0f);
+
+		pBrush->SetColor(D2D1::ColorF(textC));
+		Draw_Text_Dialog(pTarget, pBrush, D2D1::RectF(Rect.left + 10.0f, ParamInterval.top, ParamInterval.left, ParamInterval.bottom), L"回数", TextAlign::Left);
+
+		D2D1::ColorF Button(normalC);
+		D2D1::ColorF ButtonHover(hoverC);
+		float r = Button.r * (1.0f - ParamHoverAnime[0]) + ButtonHover.r * ParamHoverAnime[0];
+		float g = Button.g * (1.0f - ParamHoverAnime[0]) + ButtonHover.g * ParamHoverAnime[0];
+		float b = Button.b * (1.0f - ParamHoverAnime[0]) + ButtonHover.b * ParamHoverAnime[0];
+		pBrush->SetColor(D2D1::ColorF(r, g, b));
+		pTarget->FillRoundedRectangle(D2D1::RoundedRect(ParamInterval, 2.0f, 2.0f), pBrush);
+
+		pBrush->SetColor(D2D1::ColorF(borderC));
+		pTarget->DrawRoundedRectangle(D2D1::RoundedRect(ParamInterval, 2.0f, 2.0f), pBrush, 1.5f);
+
+		wchar_t valStr[32];
+		swprintf_s(valStr, L"%.2f", Param[0]);
+		pBrush->SetColor(D2D1::ColorF(textC));
+		Draw_Text_Dialog(pTarget, pBrush, ParamInterval, valStr, TextAlign::Center);
+
+		break;
+	}
+	case 6: {
+		D2D1_RECT_F ParamInterval = D2D1::RectF(Rect.left + 80.0f, Rect.top + 10.0f, Rect.right - 10.0f, Rect.top + 10.0f + 25.0f);
+
+		pBrush->SetColor(D2D1::ColorF(textC));
+		Draw_Text_Dialog(pTarget, pBrush, D2D1::RectF(Rect.left + 10.0f, ParamInterval.top, ParamInterval.left, ParamInterval.bottom), L"回数", TextAlign::Left);
+
+		D2D1::ColorF Button(normalC);
+		D2D1::ColorF ButtonHover(hoverC);
+		float r = Button.r * (1.0f - ParamHoverAnime[0]) + ButtonHover.r * ParamHoverAnime[0];
+		float g = Button.g * (1.0f - ParamHoverAnime[0]) + ButtonHover.g * ParamHoverAnime[0];
+		float b = Button.b * (1.0f - ParamHoverAnime[0]) + ButtonHover.b * ParamHoverAnime[0];
+		pBrush->SetColor(D2D1::ColorF(r, g, b));
+		pTarget->FillRoundedRectangle(D2D1::RoundedRect(ParamInterval, 2.0f, 2.0f), pBrush);
+
+		pBrush->SetColor(D2D1::ColorF(borderC));
+		pTarget->DrawRoundedRectangle(D2D1::RoundedRect(ParamInterval, 2.0f, 2.0f), pBrush, 1.5f);
+
+		wchar_t valStr[32];
+		swprintf_s(valStr, L"%.0f", Param[0]);
+		pBrush->SetColor(D2D1::ColorF(textC));
+		Draw_Text_Dialog(pTarget, pBrush, ParamInterval, valStr, TextAlign::Center);
+
+		break;
+	}
 	}
 }
 
@@ -542,7 +644,7 @@ struct MODDIALOG {
 	bool AddHover = false;
 	float AddHoverAnime = 0.0f;
 
-	float RangeY[4] = { 80.0f, 80.0f, 45.0f , 45.0f}; //UIのyサイズ (1項目35.0、余白10.0)
+	float RangeY[6] = { 80.0f, 80.0f, 45.0f, 45.0f, 45.0f, 45.0f }; //UIのyサイズ (1項目35.0、余白10.0)
 	float Y = 0.0f;
 	float YF = 0.0f;
 
@@ -660,6 +762,8 @@ bool MODDIALOG::Updata(D2D1_RECT_F Rect, CUR_MOD* Cursor, LOCUSES& targetLocuses
 			AppendMenuW(hMenu, MF_STRING, 102, L"離散化");
 			AppendMenuW(hMenu, MF_STRING, 103, L"速度化");
 			AppendMenuW(hMenu, MF_STRING, 104, L"ループ");
+			AppendMenuW(hMenu, MF_STRING, 105, L"ミラーループ");
+			AppendMenuW(hMenu, MF_STRING, 106, L"段々ループ");
 
 			POINT pt = { (LONG)AddButton.left, (LONG)AddButton.bottom };
 			if (Cursor->hwnd && IsWindow(Cursor->hwnd)) {
@@ -680,7 +784,7 @@ bool MODDIALOG::Updata(D2D1_RECT_F Rect, CUR_MOD* Cursor, LOCUSES& targetLocuses
 				MODIFIER NewModifier(1);
 				MODMENU NewModifierMenu;
 				NewModifierMenu.Open = true;
-				NewModifierMenu.OpenAnime = 1.0f;
+				NewModifierMenu.OpenAnime = 0.0f;
 				NewModifierMenu.Modifier = NewModifier;
 				Modifiers.push_back(NewModifierMenu);
 
@@ -692,7 +796,7 @@ bool MODDIALOG::Updata(D2D1_RECT_F Rect, CUR_MOD* Cursor, LOCUSES& targetLocuses
 				MODIFIER NewModifier(2);
 				MODMENU NewModifierMenu;
 				NewModifierMenu.Open = true;
-				NewModifierMenu.OpenAnime = 1.0f;
+				NewModifierMenu.OpenAnime = 0.0f;
 				NewModifierMenu.Modifier = NewModifier;
 				Modifiers.push_back(NewModifierMenu);
 
@@ -716,7 +820,31 @@ bool MODDIALOG::Updata(D2D1_RECT_F Rect, CUR_MOD* Cursor, LOCUSES& targetLocuses
 				MODIFIER NewModifier(4);
 				MODMENU NewModifierMenu;
 				NewModifierMenu.Open = true;
-				NewModifierMenu.OpenAnime = 1.0f;
+				NewModifierMenu.OpenAnime = 0.0f;
+				NewModifierMenu.Modifier = NewModifier;
+				Modifiers.push_back(NewModifierMenu);
+
+				targetLocuses.Modifier.push_back(NewModifier);
+				Return = true;
+				break;
+			}
+			case 105: {
+				MODIFIER NewModifier(5);
+				MODMENU NewModifierMenu;
+				NewModifierMenu.Open = true;
+				NewModifierMenu.OpenAnime = 0.0f;
+				NewModifierMenu.Modifier = NewModifier;
+				Modifiers.push_back(NewModifierMenu);
+
+				targetLocuses.Modifier.push_back(NewModifier);
+				Return = true;
+				break;
+			}
+			case 106: {
+				MODIFIER NewModifier(6);
+				MODMENU NewModifierMenu;
+				NewModifierMenu.Open = true;
+				NewModifierMenu.OpenAnime = 0.0f;
 				NewModifierMenu.Modifier = NewModifier;
 				Modifiers.push_back(NewModifierMenu);
 
@@ -775,7 +903,7 @@ void MODDIALOG::Paint(ID2D1RenderTarget* pTarget, ID2D1SolidColorBrush* pBrush, 
 		float b = Grouping.b * (1.0f - Mod.HoverAnime) + GroupingHover.b * Mod.HoverAnime;
 		pBrush->SetColor(D2D1::ColorF(r, g, b));
 		pTarget->FillRoundedRectangle(D2D1::RoundedRect(ModName, 4.0f, 4.0f), pBrush);
-		std::wstring Name[4] = { L"コマ落ち", L"離散化", L"速度化", L"ループ"};
+		std::wstring Name[6] = { L"コマ落ち", L"離散化", L"速度化", L"ループ", L"ミラーループ", L"段々ループ"};
 		pBrush->SetColor(D2D1::ColorF(textC));
 		Draw_Text_Dialog(pTarget, pBrush, D2D1::RectF(ModName.left + 30.0f, ModName.top, ModName.right, ModName.bottom), Name[Mod.Modifier.Mode - 1], TextAlign::Left);
 		D2D1_RECT_F ArrowRect = D2D1::RectF(ModName.left + 5.0f, ModName.top, ModName.left + 25.0f, ModName.bottom);

@@ -22,7 +22,7 @@ HCURSOR hDragCursor = NULL;
 //---------------------------------------------------------------------
 COMMON_PLUGIN_TABLE common_plugin_table = {
 	L"LocusMotion",								// プラグインの名前
-	L"LocusMotion β3.0 もも猫(@momo_neeeko)",		// プラグインの情報
+	L"LocusMotion β4.0 もも猫(@momo_neeeko)",		// プラグインの情報
 };
 
 //---------------------------------------------------------------------
@@ -104,7 +104,7 @@ void UpdateCursorShape(HWND hwnd, const CUR& cursor, const EDITOR& Editor, const
 		else if (Effects.RatioHover || Effects.RatioClicking) {
 			SetCursor(LoadCursor(NULL, (cursor.range.Type == 0) ? IDC_SIZENS : IDC_SIZEWE)); //エフェクト一覧割合
 		}
-		else if ((Editor.ReturnSizeHover && !Editor.ReturnSizeHide) || Editor.TurnHover || Editor.ModeMenuHover || Editor.ModeMenuClicking) {
+		else if ((Editor.ReturnSizeHover && !Editor.ReturnSizeHide) || Editor.TurnHover || Editor.ModeMenuHover || Editor.ModeMenuClicking || (!Editor.NoHover) || Editor.PlayHover) {
 			SetCursor(LoadCursor(NULL, IDC_HAND)); //エディタUIホバー
 		}
 		else if (Effects.HideButtonHover) {
@@ -219,7 +219,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		cursor.range.Update(D2D1::RectF(0.0f, 0.0f, (float)WinWidth, (float)WinHeight), (1.0f - Effects.DisplayRatio * (1.0f - Effects.HideAnime)));
 		cursor.move = D2D1::Point2(cursor.x - BeforCursor.x, cursor.y - BeforCursor.y);
 		BeforCursor = D2D1::Point2(cursor.x, cursor.y);
-		if (cursor.action || Editor.AnimeMoving || Effects.AnimeMoving || WindowResize) {
+		if (cursor.action || Editor.AnimeMoving || Effects.AnimeMoving || WindowResize || Editor.Play) {
 			bool LocusRedraw = Editor.Update(&cursor, WindowResize);
 			bool EffectRedraw = Effects.Update(&cursor);
 			if (LocusRedraw || EffectRedraw) {
@@ -363,7 +363,7 @@ SCRIPT_MODULE_FUNCTION functions[] = {
 };
 
 SCRIPT_MODULE_TABLE script_module_table = {
-	L"LocusMotion β3.0 もも猫(@momo_neeeko)",
+	L"LocusMotion β4.0 もも猫(@momo_neeeko)",
 	functions
 };
 

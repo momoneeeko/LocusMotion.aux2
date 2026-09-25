@@ -91,7 +91,7 @@ bool P_Effect::Locus_Update(D2D1_RECT_F Rect, CUR *Cursor) const {
 			LocusHoverAnime[i] = target;
 		}
 
-		if (Cursor->drop && LocusHover[i]) {
+		if (Cursor->drop && LocusHover[i] && !UseElse) {
 			LocusData.CLocus[LocusID].Locuses[i].LoadLocuses(Editor.ToLocuses());
 			Return = true;
 		}
@@ -456,7 +456,7 @@ bool P_Effect::Update(D2D1_RECT_F Rect, CUR *Cursor) const {
 	bool Return = false;
 	Hover = Cursor->RectCheck(Rect) && Cursor->RangeCheck(L"EffectsList");
 
-	if (Cursor->drop && Hover && Tipe == L"項目") {
+	if (Cursor->drop && Hover && Tipe == L"項目" && !UseElse) {
 		if (Use) {
 			LocusData.SetAllLocuses(LocusID, Editor.ToLocuses());
 		}
@@ -533,9 +533,9 @@ bool P_Effect::Update(D2D1_RECT_F Rect, CUR *Cursor) const {
 						break;
 					}
 					}
-					Cursor->x = 0.0f;
-					Cursor->y = 0.0f;
 				}
+				Cursor->x = 0.0f;
+				Cursor->y = 0.0f;
 			}
 			Return = true;
 		}
@@ -635,9 +635,10 @@ bool P_Effect::Update(D2D1_RECT_F Rect, CUR *Cursor) const {
 
 void P_Effect::Locus_Draw(D2D1_RECT_F Rect, CUR* Cursor) const {
 	if (LocusID < 0 || LocusID >= static_cast<int>(LocusData.CLocus.size())) {
-		Draw_Text(Rect, L"指定されたIDは定義されていません", TextAlign::Center);
+		D2D1_RECT_F DrawRect = D2D1::RectF(Rect.left, Rect.top, Rect.right, Rect.bottom - 20.0f);
+		Draw_Text(DrawRect, L"指定されたIDは定義されていません", TextAlign::Center);
 		g_pBrush->SetColor(D2D1::ColorF(config->get_color_code(config, "Border")));
-		g_pRenderTarget->DrawRectangle(Rect, g_pBrush, 1.0f);
+		g_pRenderTarget->DrawRectangle(DrawRect, g_pBrush, 1.0f);
 		return;
 	}
 	if (SectionWidth.size() < static_cast<size_t>(SectionNum) ||
@@ -728,9 +729,9 @@ void P_Effect::Draw(D2D1_RECT_F Rect, CUR* Cursor) const {
 	D2D1::ColorF colorNormal(config->get_color_code(config, "ButtonBody"));
 	D2D1::ColorF colorHover(config->get_color_code(config, "ButtonBodyHover"));
 
-	float r = colorNormal.r * (1.0f - HoverAnime) + colorHover.r * HoverAnime;
-	float g = colorNormal.g * (1.0f - HoverAnime) + colorHover.g * HoverAnime;
-	float b = colorNormal.b * (1.0f - HoverAnime) + colorHover.b * HoverAnime;
+	float r = colorNormal.r * (1.0f - HoverAnime) + colorHover.r * HoverAnime - !Use * 0.08f;
+	float g = colorNormal.g * (1.0f - HoverAnime) + colorHover.g * HoverAnime - !Use * 0.08f;
+	float b = colorNormal.b * (1.0f - HoverAnime) + colorHover.b * HoverAnime - !Use * 0.08f;
 
 	g_pBrush->SetColor(D2D1::ColorF(r, g, b));
 	g_pRenderTarget->FillRoundedRectangle(roundedRect2, g_pBrush);
@@ -750,7 +751,7 @@ void P_Effect::Draw(D2D1_RECT_F Rect, CUR* Cursor) const {
 		if (Open && Tipe == L"項目") {
 			Locus_Draw(D2D1::RectF(Rect.left + 5.0f, Rect.bottom + 5.0f, Rect.right - 5.0f, Rect.bottom + 120.0f - 5.0f), Cursor);
 		}
-		if (Use) {
+		if (Use && Tipe == L"項目") {
 			Draw_Text(D2D1::RectF(Rect.left, Rect.top, Rect.right - 10.0f, Rect.bottom), L"ID : " + std::to_wstring(LocusID), TextAlign::Right);
 		}
 	}
@@ -797,7 +798,13 @@ void P_Effects::GetObjectEffects() {
 		const auto& old_key_map = *p_param->p_key_map;
 
 		OBJECT_HANDLE object = edit->get_focus_object();
-		if (!object) return;
+		if (!object) {
+			Editor.PlayFinishTime = 1.5f;
+			return;
+		}
+		EDIT_INFO info = {};
+		edit_handle->get_edit_info(&info, sizeof(EDIT_INFO));
+		Editor.PlayFinishTime = (edit->get_object_layer_frame(object).end - edit->get_object_layer_frame(object).start) / ((float)info.rate / (float)info.scale);
 
 		std::unordered_map<std::wstring, int> effect_type_map;
 		edit_handle->enum_effect_name(&effect_type_map, [](void* p_data, LPCWSTR name, int type, int flag) {
@@ -843,8 +850,8 @@ void P_Effects::GetObjectEffects() {
 			effect_item.Name = effect_name;
 			effect_item.Tipe = L"エフェクト";
 			effect_item.EffectHandle = effect_h;
-			effect_item.Open = true;
-			effect_item.Use = false;
+			effect_item.Open = false;
+			effect_item.Use = true;
 
 			auto it_h = old_handle_map.find(effect_h);
 			if (it_h != old_handle_map.end()) {
@@ -1122,7 +1129,7 @@ bool P_Effects::Update(CUR *Cursor) {
 				y += 8.0f;
 				item = false;
 			}
-			D2D1_RECT_F PEffectRect = D2D1::RectF(Rect.left + 1, Rect.top + y + 1, Rect.right - 5, Rect.top + y + 30 - 1);
+			D2D1_RECT_F PEffectRect = D2D1::RectF(Rect.left + 1, Rect.top + y + 1, Rect.right - 10, Rect.top + y + 30 - 1);
 			if (e.Update(PEffectRect, Cursor)) {
 				Return = true;
 			}
@@ -1131,7 +1138,7 @@ bool P_Effects::Update(CUR *Cursor) {
 		}
 		else if ((e.Tipe == L"項目") && (open == true)) {
 			item = true;
-			D2D1_RECT_F PEffectRect = D2D1::RectF(Rect.left + 15 + 1, Rect.top + y + 1, Rect.right - 5, Rect.top + y + 30 - 1);
+			D2D1_RECT_F PEffectRect = D2D1::RectF(Rect.left + 15 + 1, Rect.top + y + 1, Rect.right - 10, Rect.top + y + 30 - 1);
 			if (e.Update(PEffectRect, Cursor)) {
 				Return = true;
 			}

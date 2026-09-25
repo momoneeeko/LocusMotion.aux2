@@ -12,7 +12,7 @@
 
 
 
-bool EDIT_LOCUSES::Update(D2D1_RECT_F Rect, CUR* Cursor, D2D1_POINT_2F OllCenter, float Size, const EDIT_LOCUSES* prevLocus, const EDIT_LOCUSES* nextLocus) const {
+bool EDIT_LOCUSES::Update(D2D1_RECT_F Rect, CUR* Cursor, D2D1_POINT_2F OllCenter, float Size, const EDIT_LOCUSES* prevLocus, const EDIT_LOCUSES* nextLocus, bool* NoHover) const {
 	bool Return = false;
 	Center = D2D1::Point2(((Locus[Mode].S.x + Locus[Mode].F.x) - 1.0f) * Size + OllCenter.x, (-(Locus[Mode].S.y + Locus[Mode].F.y) + 1.0f) * Size + OllCenter.y);
 	SizeXG = (Locus[Mode].F.x - Locus[Mode].S.x) * Size;
@@ -30,45 +30,53 @@ bool EDIT_LOCUSES::Update(D2D1_RECT_F Rect, CUR* Cursor, D2D1_POINT_2F OllCenter
 		H1Point = D2D1::Point2(SPoint.x + cos(Locus[Mode].H1.y * 100 / 180 * PI) * (SizeX / 1.6f), SPoint.y + -sin(Locus[Mode].H1.y * 100 / 180 * PI) * (SizeY / 1.6f));
 	}
 
-	if (Cursor->click && (Cursor->RangeCheck(L"LocusEditor"))) {
+	if ((Cursor->RangeCheck(L"LocusEditor"))) {
 		auto CheckHit = [](D2D1_POINT_2F pt, POS_UI pos, CUR cur) {
 			return (cur.x >= pt.x - pos.w / 2.0f && cur.x <= pt.x + pos.w / 2.0f &&
 				cur.y >= pt.y - pos.h / 2.0f && cur.y <= pt.y + pos.h / 2.0f);
 			};
 		if (Locus[Mode].Turn) {
 			if (CheckHit(SPoint, LocusUI[Mode].S, *Cursor)) {
-				Cursor->drag = false;
-				LocusUI[Mode].F.Clicking = true;
+				*NoHover = false;
+				if (Cursor->click)
+					LocusUI[Mode].F.Clicking = true;
 			}
 			else if (CheckHit(H1Point, LocusUI[Mode].H1, *Cursor)) {
-				Cursor->drag = false;
-				LocusUI[Mode].H1.Clicking = true;
+				*NoHover = false;
+				if (Cursor->click)
+					LocusUI[Mode].H1.Clicking = true;
 			}
 			else if (CheckHit(H2Point, LocusUI[Mode].H2, *Cursor)) {
-				Cursor->drag = false;
-				LocusUI[Mode].H2.Clicking = true;
+				*NoHover = false;
+				if (Cursor->click)
+					LocusUI[Mode].H2.Clicking = true;
 			}
 			else if (CheckHit(FPoint, LocusUI[Mode].F, *Cursor)) {
-				Cursor->drag = false;
-				LocusUI[Mode].S.Clicking = true;
+				*NoHover = false;
+				if (Cursor->click)
+					LocusUI[Mode].S.Clicking = true;
 			}
 		}
 		else {
 			if (CheckHit(SPoint, LocusUI[Mode].S, *Cursor)) {
-				Cursor->drag = false;
-				LocusUI[Mode].S.Clicking = true;
+				*NoHover = false;
+				if (Cursor->click)
+					LocusUI[Mode].S.Clicking = true;
 			}
 			else if (CheckHit(H1Point, LocusUI[Mode].H1, *Cursor)) {
-				Cursor->drag = false;
-				LocusUI[Mode].H1.Clicking = true;
+				*NoHover = false;
+				if (Cursor->click)
+					LocusUI[Mode].H1.Clicking = true;
 			}
 			else if (CheckHit(H2Point, LocusUI[Mode].H2, *Cursor)) {
-				Cursor->drag = false;
-				LocusUI[Mode].H2.Clicking = true;
+				*NoHover = false;
+				if (Cursor->click)
+					LocusUI[Mode].H2.Clicking = true;
 			}
 			else if (CheckHit(FPoint, LocusUI[Mode].F, *Cursor)) {
-				Cursor->drag = false;
-				LocusUI[Mode].F.Clicking = true;
+				*NoHover = false;
+				if (Cursor->click)
+					LocusUI[Mode].F.Clicking = true;
 			}
 		}
 	}
@@ -83,6 +91,7 @@ bool EDIT_LOCUSES::Update(D2D1_RECT_F Rect, CUR* Cursor, D2D1_POINT_2F OllCenter
 	if (Cursor->moveing) {
 		auto UpdatePos = [&](POS& pos, POS_UI& posUI, int PosTipe, float x, float y) {
 			if (posUI.Clicking) {
+				*NoHover = false;
 				float prevS_x = prevLocus ? prevLocus->Locus[Mode].S.x : 0.0f;
 				float nextF_x = nextLocus ? nextLocus->Locus[Mode].F.x : 1.0f;
 
@@ -416,12 +425,7 @@ void EDITOR::GridDraw(D2D1_RECT_F Rect, float Size, D2D1_POINT_2F Center, int Gr
 
 bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 	bool Return = LocusUpdate;
-	if (Cursor->click && Cursor->RangeCheck(L"LocusEditor")) {
-		Cursor->drag = true;
-	}
-	if (!Cursor->clicking) {
-		Cursor->drag = false;
-	}
+	NoHover = true;
 
 	if (Cursor->rclick && Cursor->RangeCheck(L"LocusEditor")) {
 		Cursor->rclick = false;
@@ -561,7 +565,7 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 
 	bool UpdateSize = LocusUpdate;
 	D2D1_RECT_F Rect = Cursor->range.Range[L"Locus"];
-	D2D1_RECT_F Lrect = D2D1::RectF(Rect.left + 30.0f, Rect.top + 30.0f + 40.0f, Rect.right - 30.0f, Rect.bottom - 30.0f);
+	D2D1_RECT_F Lrect = D2D1::RectF(Rect.left + 30.0f, Rect.top + 30.0f + 40.0f, Rect.right - 30.0f, Rect.bottom - 30.0f - 40.0f);
 
 	float Size = (std::max)((std::min)(std::abs(Lrect.right - Lrect.left), std::abs(Lrect.bottom - Lrect.top)) / 2.0f, 0.01f);
 	Size = (std::max)(Size, 10.0f);
@@ -691,7 +695,7 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 		if (UpdateSize) {
 			Locus[i].UpdateLocus = true;
 		}
-		if (Locus[i].Update(Lrect, Cursor, Center, Size, prevLocus, nextLocus)) {
+		if (Locus[i].Update(Lrect, Cursor, Center, Size, prevLocus, nextLocus, &NoHover)) {
 			Return = true;
 		}
 	}
@@ -750,6 +754,28 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 		}
 	}
 
+	D2D1_RECT_F PlayRect = D2D1::RectF(Rect.left + 10.0f, Rect.bottom - 40.0f, Rect.left + 10.0f + 34.0f, Rect.bottom - 6.0f);;
+	PlayHover = Cursor->RectCheck(PlayRect);
+	if (PlayHover) {
+		if (Cursor->click) {
+			Play = !Play;
+			PlayTime = 0.0f;
+			PlayRatio = 0.0f;
+			PlayStartTime = std::chrono::steady_clock::now();
+			Return = true;
+		}
+		PlayHoverAnime += (1.0f - PlayHoverAnime) / 1.8f;
+		if (abs(PlayHoverAnime - 1.0f) < 0.001) {
+			PlayHoverAnime = 1.0f;
+		}
+	}
+	else {
+		PlayHoverAnime += (0.0f - PlayHoverAnime) / 2.3f;
+		if (abs(PlayHoverAnime - 0.0f) < 0.001) {
+			PlayHoverAnime = 0.0f;
+		}
+	}
+
 	D2D1_RECT_F ReturnSizeRect = D2D1::RectF(Rect.right - 10.0f - 34.0f, Rect.bottom - 40.0f, Rect.right - 10.0f, Rect.bottom - 6.0f);
 	if (sizeF != 1.0f || xF != 0.0f || yF != 0.0f) {
 		ReturnSizeHide = false;
@@ -764,7 +790,7 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 			xF = 0.0f;
 			yF = 0.0f;
 			ReturnSizeHide = true;
-			Cursor->drag = false;
+			NoHover = false;
 		}
 		ReturnSizeHoverAnime += (1.0f - ReturnSizeHoverAnime) / 1.8f;
 		if (abs(ReturnSizeHoverAnime - 1.0f) < 0.001) {
@@ -789,19 +815,39 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 			ReturnSizeHideAnime = 1.0f;
 		}
 	}
-	if ((x == xF) && (y == yF) && (size == sizeF) && ((ModeMenuAnime == 0.0f) || (ModeMenuAnime == 1.0f) || (ModeMenuAnime == 2.0f)) && ((TurnHoverAnime == 0.0f) || (TurnHoverAnime == 1.0f)) && ((ReturnSizeHoverAnime == 0.0f) || (ReturnSizeHoverAnime == 1.0f)) && ((ReturnSizeHideAnime == 0.0f) || (ReturnSizeHideAnime == 1.0f))) {
+
+	if ((x == xF) && (y == yF) && (size == sizeF) && ((ModeMenuAnime == 0.0f) || (ModeMenuAnime == 1.0f) || (ModeMenuAnime == 2.0f)) && ((TurnHoverAnime == 0.0f) || (TurnHoverAnime == 1.0f)) && ((ReturnSizeHoverAnime == 0.0f) || (ReturnSizeHoverAnime == 1.0f)) && ((ReturnSizeHideAnime == 0.0f) || (ReturnSizeHideAnime == 1.0f)) && ((PlayHoverAnime == 0.0f) || (PlayHoverAnime == 1.0f))) {
 		AnimeMoving = false;
 	}
 	else {
 		AnimeMoving = true;
 		Return = true;
 	}
+
+	//ドラッグ開始
+	if (NoHover && Cursor->click && Cursor->RangeCheck(L"LocusEditor")) {
+		Cursor->drag = true;
+	}
+	if (!Cursor->clicking){
+		Cursor->drag = false;
+	}
+
+	if (Play) {
+		std::chrono::duration<float> elapsed = (std::chrono::steady_clock::now() - PlayStartTime);
+		PlayTime = elapsed.count();
+		PlayRatio = PlayTime / PlayFinishTime;
+		if (PlayRatio > 1.0f) {
+			Play = false;
+		}
+		Return = true;
+	}
+
 	return Return;
 }
 
 void EDITOR::Draw(CUR *Cursor) {
 	D2D1_RECT_F Rect = Cursor->range.Range[L"Locus"];
-	D2D1_RECT_F Lrect = D2D1::RectF(Rect.left + 30.0f, Rect.top + 30.0f + 40.0f, Rect.right - 30.0f, Rect.bottom - 30.0f);
+	D2D1_RECT_F Lrect = D2D1::RectF(Rect.left + 30.0f, Rect.top + 30.0f + 40.0f, Rect.right - 30.0f, Rect.bottom - 30.0f - 40.0f);
 
 	float Size = (std::min)(std::abs(Lrect.right - Lrect.left), std::abs(Lrect.bottom - Lrect.top)) / 2.0f;
 	Size = (std::max)(Size, 10.0f);
@@ -812,6 +858,21 @@ void EDITOR::Draw(CUR *Cursor) {
 	);
 
 	GridDraw(Rect, Size * 2.0f, Center, 5);
+
+	if (Play) {
+		D2D1_RECT_F PlayRect = D2D1::RectF((Center.x + Size * (PlayRatio * 2.0f - 1.0f)) - 0.5f, Rect.top, (Center.x + Size * (PlayRatio * 2.0f - 1.0f)) + 0.5f, Rect.bottom);
+		g_pBrush->SetColor(D2D1::ColorF(0x52d4ff, 0.75f));
+		g_pRenderTarget->FillRectangle(PlayRect, g_pBrush);
+
+		float y = ToLocuses().LocusesToValue(PlayRatio, 20);
+		PlayRect = D2D1::RectF(Center.x - Size, (Center.y + -Size * (y * 2.0f - 1.0f)) - 0.5f, Center.x + Size, (Center.y + -Size * (y * 2.0f - 1.0f)) + 0.5f);
+		g_pBrush->SetColor(D2D1::ColorF(0x52d4ff, 0.75f));
+		g_pRenderTarget->FillRectangle(PlayRect, g_pBrush);
+
+		g_pBrush->SetColor(D2D1::ColorF(0x52d4ff));
+		D2D1_ELLIPSE P = D2D1::Ellipse(D2D1::Point2(Rect.left + 15.0f, Center.y + -Size * (y * 2.0f - 1.0f)), 5.0f, 5.0f);
+		g_pRenderTarget->FillEllipse(P, g_pBrush);
+	}
 
 	for (size_t i = 0; i < Locus.size(); ++i) {
 		const EDIT_LOCUSES* prevLocus = (i > 0) ? &Locus[i - 1] : nullptr;
@@ -865,6 +926,7 @@ void EDITOR::Draw(CUR *Cursor) {
 		Draw_Svg(304, TempRect, 0.618f, 0.0f, D2D1::ColorF(config->get_color_code(config, "Text")));
 	}
 
+	//反転ボタン
 	D2D1_RECT_F TurnRect = D2D1::RectF(Rect.right - 10.0f - 34.0f, Rect.top + 6.0f, Rect.right - 10.0f, Rect.top + 40.0f);
 	float TempCol = 0.3f * (1.0f - TurnHoverAnime) + 0.5f * TurnHoverAnime;
 	g_pBrush->SetColor(D2D1::ColorF(TempCol, TempCol, TempCol, 0.5f));
@@ -873,12 +935,21 @@ void EDITOR::Draw(CUR *Cursor) {
 	g_pRenderTarget->DrawRoundedRectangle(D2D1::RoundedRect(TurnRect, 5.0f, 5.0f), g_pBrush, 0.25f);
 	Draw_Svg(321, TurnRect, 0.5f, 0.0f, D2D1::ColorF(config->get_color_code(config, "Text")));
 
+	//カメラ初期化ボタン
 	D2D1_RECT_F ReturnSizeRect = D2D1::RectF(Rect.right - 10.0f - 34.0f, Rect.bottom - 40.0f, Rect.right - 10.0f, Rect.bottom - 6.0f);
-
 	TempCol = 0.3f * (1.0f - ReturnSizeHoverAnime) + 0.5f * ReturnSizeHoverAnime;
 	g_pBrush->SetColor(D2D1::ColorF(TempCol, TempCol, TempCol, ReturnSizeHideAnime * 0.5f));
 	g_pRenderTarget->FillRoundedRectangle(D2D1::RoundedRect(ReturnSizeRect, 5.0f, 5.0f), g_pBrush);
 	g_pBrush->SetColor(D2D1::ColorF(1.0f, 1.0f, 1.0f, ReturnSizeHideAnime * 0.5f));
 	g_pRenderTarget->DrawRoundedRectangle(D2D1::RoundedRect(ReturnSizeRect, 5.0f, 5.0f), g_pBrush, 0.25f);
 	Draw_Svg(322, ReturnSizeRect, 0.618f, 0.0f, D2D1::ColorF(config->get_color_code(config, "Text"), ReturnSizeHideAnime));
+
+	//プレビュー再生ボタン
+	D2D1_RECT_F PlayRect = D2D1::RectF(Rect.left + 10.0f, Rect.bottom - 40.0f, Rect.left + 10.0f + 34.0f, Rect.bottom - 6.0f);
+	TempCol = 0.3f * (1.0f - PlayHoverAnime) + 0.5f * PlayHoverAnime;
+	g_pBrush->SetColor(D2D1::ColorF(TempCol, TempCol, TempCol, 0.5f));
+	g_pRenderTarget->FillRoundedRectangle(D2D1::RoundedRect(PlayRect, 5.0f, 5.0f), g_pBrush);
+	g_pBrush->SetColor(D2D1::ColorF(1.0f, 1.0f, 1.0f, 0.5f));
+	g_pRenderTarget->DrawRoundedRectangle(D2D1::RoundedRect(PlayRect, 5.0f, 5.0f), g_pBrush, 0.25f);
+	Draw_Svg((Play ? 324 : 323), PlayRect, 0.48f, 0.0f, D2D1::ColorF(config->get_color_code(config, "Text")));
 }

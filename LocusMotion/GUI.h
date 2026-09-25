@@ -6,6 +6,7 @@ using Microsoft::WRL::ComPtr;
 #include <string>
 #include <vector>
 #include <map>
+#include <chrono>
 
 #include "plugin2.h"
 
@@ -72,6 +73,24 @@ struct MODIFIER {
 			break;
 		}
 		case 4: {	//ループ
+			Param.push_back(5.0);	// 回数
+			for (int i = 0; i < 1; i++) {
+				ParamHover.push_back(false);
+				ParamHoverAnime.push_back(0.0f);
+				ParamUse.push_back(false);
+			}
+			break;
+		}
+		case 5: {	//ミラーループ
+			Param.push_back(5.0);	// 回数
+			for (int i = 0; i < 1; i++) {
+				ParamHover.push_back(false);
+				ParamHoverAnime.push_back(0.0f);
+				ParamUse.push_back(false);
+			}
+			break;
+		}
+		case 6: {	//段々ループ
 			Param.push_back(5.0);	// 回数
 			for (int i = 0; i < 1; i++) {
 				ParamHover.push_back(false);
@@ -190,7 +209,7 @@ struct RANGE {
 			Range[L"EffectsListRatio"] = D2D1::RectF(Range[L"EffectsList"].left - 5.0f, Range[L"EffectsList"].top, Range[L"EffectsList"].left, Range[L"EffectsList"].bottom);
 			Range[L"Locus"] = D2D1::RectF(0.0f, 0.0f, (Width - 30.0f) * DisplayRatio, Height);
 		}
-		Range[L"LocusEditor"] = D2D1::RectF(Range[L"Locus"].left, Range[L"Locus"].top + 40.0f, Range[L"Locus"].right, Range[L"Locus"].bottom);
+		Range[L"LocusEditor"] = D2D1::RectF(Range[L"Locus"].left, Range[L"Locus"].top + 40.0f, Range[L"Locus"].right, Range[L"Locus"].bottom - 40.0f);
 		Range[L"LocusMenu"] = D2D1::RectF(Range[L"Locus"].left + 10.0f, Range[L"Locus"].top + 6.0f, Range[L"Locus"].right - 10.0f - 44.0f, Range[L"Locus"].top + 40.0f);
 	}
 };
@@ -263,7 +282,7 @@ public:
 
 	//曲線を更新する
 	void UpdateGeometry(float size, D2D1_POINT_2F OllCenter) const;
-	bool Update(D2D1_RECT_F Rect, CUR* Cursor, D2D1_POINT_2F OllCenter, float Size, const EDIT_LOCUSES* prevLocus, const EDIT_LOCUSES* nextLocus) const;
+	bool Update(D2D1_RECT_F Rect, CUR* Cursor, D2D1_POINT_2F OllCenter, float Size, const EDIT_LOCUSES* prevLocus, const EDIT_LOCUSES* nextLocus, bool* NoHover) const;
 	void Draw(D2D1_RECT_F Rect, D2D1_POINT_2F OllCenter, float Size, const EDIT_LOCUSES* prevLocus, const EDIT_LOCUSES* nextLocus) const;
 };
 
@@ -286,13 +305,22 @@ public:
 	bool AnimeMoving = false;
 	bool ModeMenuHover = false;
 	bool ModeMenuClicking = false;
-	float ModeMenuAnime = 1.0f;
+	float ModeMenuAnime = 0.0f;
 	bool TurnHover = false;
 	float TurnHoverAnime = 1.0f;
 	bool ReturnSizeHide = true;
 	float ReturnSizeHideAnime = 0.0f;
 	bool ReturnSizeHover = false;
 	float ReturnSizeHoverAnime = 0.0f;
+	bool PlayHover = false;
+	float PlayHoverAnime = 0.0f;
+	bool NoHover = true;
+
+	bool Play = false;
+	float PlayTime = 0.0f;
+	float PlayRatio = 0.0f;
+	std::chrono::steady_clock::time_point PlayStartTime;
+	float PlayFinishTime = 1.5f;
 
 	void GridDraw(D2D1_RECT_F Rect, float Size, D2D1_POINT_2F Center, int Grid);
 	bool Update(CUR *Cursor, bool LocusUpdate);
@@ -374,7 +402,7 @@ public:
 	bool HideButtonHover = false;
 	float HideButtonHoverAnime = 0.0f;
 
-	float DisplayRatio = 0.5f;		//エディタとエフェクト一覧の割合
+	float DisplayRatio = 0.45f;		//エディタとエフェクト一覧の割合
 	bool RatioHover = false;
 	float RatioHoverAnime = 0.0f;
 	bool RatioClicking = false;
