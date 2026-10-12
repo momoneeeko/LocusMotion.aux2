@@ -30,7 +30,8 @@ bool EDIT_LOCUSES::Update(D2D1_RECT_F Rect, CUR* Cursor, D2D1_POINT_2F OllCenter
 		H1Point = D2D1::Point2(SPoint.x + cos(Locus[Mode].H1.y * 100 / 180 * PI) * (SizeX / 1.6f), SPoint.y + -sin(Locus[Mode].H1.y * 100 / 180 * PI) * (SizeY / 1.6f));
 	}
 
-	if ((Cursor->RangeCheck(L"LocusEditor"))) {
+	D2D1_RECT_F Menu2 = Cursor->range.Range[L"LocusMenu2"];
+	if (Cursor->RangeCheck(L"Locus") && !Cursor->RangeCheck(L"LocusMenu") && !Cursor->RectCheck(D2D1::RectF(Menu2.left, Menu2.top, Menu2.left + 34.0f, Menu2.bottom)) && !Cursor->RectCheck(D2D1::RectF(Menu2.right - 34.0f, Menu2.top, Menu2.right, Menu2.bottom))) {
 		auto CheckHit = [](D2D1_POINT_2F pt, POS_UI pos, CUR cur) {
 			return (cur.x >= pt.x - pos.w / 2.0f && cur.x <= pt.x + pos.w / 2.0f &&
 				cur.y >= pt.y - pos.h / 2.0f && cur.y <= pt.y + pos.h / 2.0f);
@@ -569,12 +570,12 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 
 	float Size = (std::max)((std::min)(std::abs(Lrect.right - Lrect.left), std::abs(Lrect.bottom - Lrect.top)) / 2.0f, 0.01f);
 	Size = (std::max)(Size, 10.0f);
-	if (Cursor->wheel > 0.0f && Cursor->RangeCheck(L"Locus")) {
+	if (Cursor->wheel > 0.0f && (Cursor->RangeCheck(L"LocusEditor") || Cursor->RangeCheck(L"LocusMenu2"))) {
 		if (sizeF < 10.0f) {
 			sizeF *= 1.1f * Cursor->wheel;
 		}
 	}
-	else if (Cursor->wheel < 0.0f && Cursor->RangeCheck(L"Locus")) {
+	else if (Cursor->wheel < 0.0f && (Cursor->RangeCheck(L"LocusEditor") || Cursor->RangeCheck(L"LocusMenu2"))) {
 		if (sizeF > 0.05f) {
 			sizeF /= 1.1f * -Cursor->wheel;
 		}
@@ -588,7 +589,8 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 	}
 	Size *= size;
 
-	if (Cursor->mclick && Cursor->RangeCheck(L"LocusEditor")) {
+	D2D1_RECT_F Menu2 = Cursor->range.Range[L"LocusMenu2"];
+	if (Cursor->mclick && Cursor->RangeCheck(L"Locus") && !Cursor->RangeCheck(L"LocusMenu") && !Cursor->RectCheck(D2D1::RectF(Menu2.left, Menu2.top, Menu2.left + 34.0f, Menu2.bottom)) && !Cursor->RectCheck(D2D1::RectF(Menu2.right - 34.0f, Menu2.top, Menu2.right, Menu2.bottom))) {
 		Mclicking = true;
 	}
 	if (!Cursor->mclicking) {
@@ -718,18 +720,23 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 	}
 	if (!Cursor->clicking && ModeMenuClicking) {
 		ModeMenuClicking = false;
-		if (Locus[SelectLocus].Mode != 3) {
-			Locus[SelectLocus].UseMode3 = false;
-			Return = true;
-		}
 	}
 	if (ModeMenuClicking) {
 		int ModeTemp = (int)floor((Cursor->x - ModeRect.left) / ((ModeRect.right - ModeRect.left) / (Locus[SelectLocus].UseMode3 ? 4.0f : 3.0f)));
 		Locus[SelectLocus]. Mode = (std::min)((std::max)(ModeTemp, 0), (Locus[SelectLocus].UseMode3 ? 3 : 2));
 		Locus[SelectLocus].UpdateLocus = true;
 	}
+	else {
+		if (!ModeMenuHover && Locus[SelectLocus].Mode != 3) {
+			Locus[SelectLocus].UseMode3 = false;
+			Return = true;
+		}
+	}
+	if (Cursor->wheel != 0.0f && ModeMenuHover) {
+		Locus[SelectLocus].Mode = (std::min)((std::max)(Locus[SelectLocus].Mode + (int)(-Cursor->wheel / abs(Cursor->wheel)), 0), (Locus[SelectLocus].UseMode3 ? 3 : 2));
+	}
 
-	ModeMenuAnime += ((float)Locus[SelectLocus]. Mode - ModeMenuAnime) / 2.3f;
+	ModeMenuAnime += ((float)Locus[SelectLocus]. Mode - ModeMenuAnime) / 2.6f;
 	if (abs(ModeMenuAnime - (float)Locus[SelectLocus].Mode) < 0.001) {
 		ModeMenuAnime = (float)Locus[SelectLocus].Mode;
 	}
@@ -909,11 +916,11 @@ void EDITOR::Draw(CUR *Cursor) {
 		);
 		g_pRenderTarget->FillRectangle(TempRect, g_pBrush);
 	}
-	g_pBrush->SetColor(D2D1::ColorF(0xffffff, 0.3f));
+	g_pBrush->SetColor(D2D1::ColorF(0xffffff, 0.25f));
 	TempRect = D2D1::RectF(ModeRect.left + 3.5f, ModeRect.top + 2.5f, ModeRect.left + (ModeRect.right - ModeRect.left) * (1.0f / (Locus[SelectLocus].UseMode3 ? 4.0f : 3.0f)) - 3.5f, ModeRect.bottom - 2.5f);
 	TempRect = D2D1::RectF(TempRect.left + (ModeRect.right - ModeRect.left) * ((1.0f / (Locus[SelectLocus].UseMode3 ? 4.0f : 3.0f)) * ModeMenuAnime), TempRect.top, TempRect.right + (ModeRect.right - ModeRect.left) * ((1.0f / (Locus[SelectLocus].UseMode3 ? 4.0f : 3.0f)) * ModeMenuAnime), TempRect.bottom);
 	g_pRenderTarget->FillRoundedRectangle(D2D1::RoundedRect(TempRect, 5.0f, 5.0f), g_pBrush);
-	g_pBrush->SetColor(D2D1::ColorF(0xffffff, 0.75f));
+	g_pBrush->SetColor(D2D1::ColorF(0xffffff, 0.7f));
 	g_pRenderTarget->DrawRoundedRectangle(D2D1::RoundedRect(TempRect, 5.0f, 5.0f), g_pBrush, 0.5f);
 	TempRect = D2D1::RectF(ModeRect.left + 3.5f, ModeRect.top + 2.5f, ModeRect.left + (ModeRect.right - ModeRect.left) * (1.0f / (Locus[SelectLocus].UseMode3 ? 4.0f : 3.0f)) - 3.5f, ModeRect.bottom - 2.5f);
 	Draw_Svg(301, TempRect, 0.618f, 0.0f, D2D1::ColorF(config->get_color_code(config, "Text")));
@@ -933,7 +940,7 @@ void EDITOR::Draw(CUR *Cursor) {
 	g_pRenderTarget->FillRoundedRectangle(D2D1::RoundedRect(TurnRect, 5.0f, 5.0f), g_pBrush);
 	g_pBrush->SetColor(D2D1::ColorF(1.0f, 1.0f, 1.0f, 0.5f));
 	g_pRenderTarget->DrawRoundedRectangle(D2D1::RoundedRect(TurnRect, 5.0f, 5.0f), g_pBrush, 0.25f);
-	Draw_Svg(321, TurnRect, 0.5f, 0.0f, D2D1::ColorF(config->get_color_code(config, "Text")));
+	Draw_Svg(321, TurnRect, 0.5f, 0.0f, D2D1::ColorF(0xffffff));
 
 	//カメラ初期化ボタン
 	D2D1_RECT_F ReturnSizeRect = D2D1::RectF(Rect.right - 10.0f - 34.0f, Rect.bottom - 40.0f, Rect.right - 10.0f, Rect.bottom - 6.0f);
@@ -942,7 +949,7 @@ void EDITOR::Draw(CUR *Cursor) {
 	g_pRenderTarget->FillRoundedRectangle(D2D1::RoundedRect(ReturnSizeRect, 5.0f, 5.0f), g_pBrush);
 	g_pBrush->SetColor(D2D1::ColorF(1.0f, 1.0f, 1.0f, ReturnSizeHideAnime * 0.5f));
 	g_pRenderTarget->DrawRoundedRectangle(D2D1::RoundedRect(ReturnSizeRect, 5.0f, 5.0f), g_pBrush, 0.25f);
-	Draw_Svg(322, ReturnSizeRect, 0.618f, 0.0f, D2D1::ColorF(config->get_color_code(config, "Text"), ReturnSizeHideAnime));
+	Draw_Svg(322, ReturnSizeRect, 0.618f, 0.0f, D2D1::ColorF(0xffffff, ReturnSizeHideAnime));
 
 	//プレビュー再生ボタン
 	D2D1_RECT_F PlayRect = D2D1::RectF(Rect.left + 10.0f, Rect.bottom - 40.0f, Rect.left + 10.0f + 34.0f, Rect.bottom - 6.0f);
@@ -951,5 +958,5 @@ void EDITOR::Draw(CUR *Cursor) {
 	g_pRenderTarget->FillRoundedRectangle(D2D1::RoundedRect(PlayRect, 5.0f, 5.0f), g_pBrush);
 	g_pBrush->SetColor(D2D1::ColorF(1.0f, 1.0f, 1.0f, 0.5f));
 	g_pRenderTarget->DrawRoundedRectangle(D2D1::RoundedRect(PlayRect, 5.0f, 5.0f), g_pBrush, 0.25f);
-	Draw_Svg((Play ? 324 : 323), PlayRect, 0.48f, 0.0f, D2D1::ColorF(config->get_color_code(config, "Text")));
+	Draw_Svg((Play ? 324 : 323), PlayRect, 0.48f, 0.0f, D2D1::ColorF(0xffffff));
 }

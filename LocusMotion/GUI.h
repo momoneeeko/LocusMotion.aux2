@@ -197,20 +197,28 @@ struct RANGE {
 		float Height = (Window.bottom - Window.top);
 		if (Width < Height) {
 			Type = 0;
+			//エフェクトリスト
 			Range[L"EffectsList"] = D2D1::RectF(0.0f, (Height - 30.0f) * DisplayRatio + 5.0f, Width, Height - 30.0f);
+			//エフェクトリストを隠すボタン
 			Range[L"EffectsListHide"] = D2D1::RectF(Range[L"EffectsList"].left, Range[L"EffectsList"].bottom, Range[L"EffectsList"].right, Range[L"EffectsList"].bottom + 30.0f);
-			Range[L"EffectsListRatio"] = D2D1::RectF(Range[L"EffectsList"].left, Range[L"EffectsList"].top - 5.0f, Range[L"EffectsList"].right, Range[L"EffectsList"].top);
+			//エフェクトリストの表示比率を変える範囲
+			Range[L"EffectsListRatio"] = D2D1::RectF(Range[L"EffectsList"].left, Range[L"EffectsList"].top, Range[L"EffectsList"].right, Range[L"EffectsList"].top + 5.0f);
+			//エディタ全体
 			Range[L"Locus"] = D2D1::RectF(0.0f, 0.0f, Width, (Height - 30.0f) * DisplayRatio);
 		}
 		else {
 			Type = 1;
 			Range[L"EffectsList"] = D2D1::RectF((Width - 30.0f) * DisplayRatio + 5.0f, 0.0f, Width - 30.0f, Height);
 			Range[L"EffectsListHide"] = D2D1::RectF(Range[L"EffectsList"].right, Range[L"EffectsList"].top, Range[L"EffectsList"].right + 30.0f, Range[L"EffectsList"].bottom);
-			Range[L"EffectsListRatio"] = D2D1::RectF(Range[L"EffectsList"].left - 5.0f, Range[L"EffectsList"].top, Range[L"EffectsList"].left, Range[L"EffectsList"].bottom);
+			Range[L"EffectsListRatio"] = D2D1::RectF(Range[L"EffectsList"].left, Range[L"EffectsList"].top, Range[L"EffectsList"].left + 5.0f, Range[L"EffectsList"].bottom);
 			Range[L"Locus"] = D2D1::RectF(0.0f, 0.0f, (Width - 30.0f) * DisplayRatio, Height);
 		}
+		//エディタの曲線表示部分
 		Range[L"LocusEditor"] = D2D1::RectF(Range[L"Locus"].left, Range[L"Locus"].top + 40.0f, Range[L"Locus"].right, Range[L"Locus"].bottom - 40.0f);
-		Range[L"LocusMenu"] = D2D1::RectF(Range[L"Locus"].left + 10.0f, Range[L"Locus"].top + 6.0f, Range[L"Locus"].right - 10.0f - 44.0f, Range[L"Locus"].top + 40.0f);
+		//エディタ上部メニュー
+		Range[L"LocusMenu"] = D2D1::RectF(Range[L"Locus"].left + 10.0f, Range[L"Locus"].top + 6.0f, Range[L"Locus"].right - 10.0f, Range[L"Locus"].top + 40.0f);
+		//エディタ下部ボタン
+		Range[L"LocusMenu2"] = D2D1::RectF(Range[L"Locus"].left + 10.0f, Range[L"Locus"].bottom - 40.0f, Range[L"Locus"].right - 10.0f, Range[L"Locus"].bottom - 6.0f);
 	}
 };
 
@@ -399,10 +407,13 @@ public:
 
 	bool Hide = false;
 	float HideAnime = 0.0f;
+	float HideNum = 0;
+	int HideNumF = 0;
 	bool HideButtonHover = false;
 	float HideButtonHoverAnime = 0.0f;
 
 	float DisplayRatio = 0.45f;		//エディタとエフェクト一覧の割合
+	bool RatioLock = false;
 	bool RatioHover = false;
 	float RatioHoverAnime = 0.0f;
 	bool RatioClicking = false;

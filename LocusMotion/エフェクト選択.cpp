@@ -7,6 +7,7 @@
 #include <iostream>
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 
 #include <random>
 
@@ -729,9 +730,9 @@ void P_Effect::Draw(D2D1_RECT_F Rect, CUR* Cursor) const {
 	D2D1::ColorF colorNormal(config->get_color_code(config, "ButtonBody"));
 	D2D1::ColorF colorHover(config->get_color_code(config, "ButtonBodyHover"));
 
-	float r = colorNormal.r * (1.0f - HoverAnime) + colorHover.r * HoverAnime - !Use * 0.08f;
-	float g = colorNormal.g * (1.0f - HoverAnime) + colorHover.g * HoverAnime - !Use * 0.08f;
-	float b = colorNormal.b * (1.0f - HoverAnime) + colorHover.b * HoverAnime - !Use * 0.08f;
+	float r = (colorNormal.r * (1.0f - HoverAnime) + colorHover.r * HoverAnime) * (Use ? 1.0f : 0.85f);
+	float g = (colorNormal.g * (1.0f - HoverAnime) + colorHover.g * HoverAnime) * (Use ? 1.0f : 0.85f);
+	float b = (colorNormal.b * (1.0f - HoverAnime) + colorHover.b * HoverAnime) * (Use ? 1.0f : 0.85f);
 
 	g_pBrush->SetColor(D2D1::ColorF(r, g, b));
 	g_pRenderTarget->FillRoundedRectangle(roundedRect2, g_pBrush);
@@ -1071,19 +1072,88 @@ bool P_Effects::Update(CUR *Cursor) {
 		}
 	}
 	HideButtonHover = Cursor->RectCheck(Cursor->range.Range[L"EffectsListHide"]);
-	RatioHover = Cursor->RectCheck(Cursor->range.Range[L"EffectsListRatio"]);
+	RatioHover = Cursor->RectCheck(Cursor->range.Range[L"EffectsListRatio"]) && !Hide;
 
 	if (HideButtonHover && Cursor->click) {
 		Hide = !Hide;
+		HideNumF += 1;
+		//iniŠÖŒW
+		if (config && config->app_data_path) {
+			std::filesystem::path dirPath = std::filesystem::path(config->app_data_path) / L"Plugin" / L"LocusMotion";
+			std::error_code ec;
+			std::filesystem::create_directories(dirPath, ec);
+			if (!ec) {
+				std::filesystem::path iniPath = dirPath / L"config.ini";
+				const wchar_t* path = iniPath.c_str();
+				WritePrivateProfileStringW(L"EffectWindow", L"Hide", std::to_wstring(Hide).c_str(), path);
+			}
+		}
 		Return = true;
 	}
-	if (RatioHover && Cursor->click) {
-		RatioClicking = true;
-		Return = true;
+	if (RatioHover) {
+		if (Cursor->click && !RatioLock) {
+			RatioClicking = true;
+			Return = true;
+		}
+		if (Cursor->rclick) {
+			Cursor->click = false;
+			Cursor->rclick = false;
+			HMENU hMenu = CreatePopupMenu();
+			if (hMenu) {
+				if (RatioLock) {
+					AppendMenuW(hMenu, MF_CHECKED, 101, L"”ä—¦‚ÌŒÅ’è‚ð‰ðœ");
+				}
+				else {
+					AppendMenuW(hMenu, MF_STRING, 101, L"”ä—¦‚ðŒÅ’è");
+				}
+
+				POINT pt = { (LONG)Cursor->x, (LONG)Cursor->y };
+				ClientToScreen(Cursor->hwnd, &pt);
+
+				SetForegroundWindow(Cursor->hwnd);
+				int cmd = TrackPopupMenu(
+					hMenu,
+					TPM_RIGHTBUTTON | TPM_RETURNCMD,
+					pt.x, pt.y,
+					0, Cursor->hwnd, NULL
+				);
+				DestroyMenu(hMenu);
+
+				switch (cmd) {
+				case 101:
+				{
+					RatioLock = !RatioLock;
+					if (config && config->app_data_path) {
+						std::filesystem::path dirPath = std::filesystem::path(config->app_data_path) / L"Plugin" / L"LocusMotion";
+						std::error_code ec;
+						std::filesystem::create_directories(dirPath, ec);
+						if (!ec) {
+							std::filesystem::path iniPath = dirPath / L"config.ini";
+							const wchar_t* path = iniPath.c_str();
+							WritePrivateProfileStringW(L"EffectWindow", L"RatioLock", std::to_wstring(RatioLock).c_str(), path);
+						}
+					}
+					break;
+				}
+				}
+			}
+			Cursor->x = 0.0f;
+			Cursor->y = 0.0f;
+		}
 	}
 	if (RatioClicking) {
 		if (!Cursor->clicking) {
 			RatioClicking = false;
+			if (config && config->app_data_path) {
+				std::filesystem::path dirPath = std::filesystem::path(config->app_data_path) / L"Plugin" / L"LocusMotion";
+				std::error_code ec;
+				std::filesystem::create_directories(dirPath, ec);
+				if (!ec) {
+					std::filesystem::path iniPath = dirPath / L"config.ini";
+					const wchar_t* path = iniPath.c_str();
+					WritePrivateProfileStringW(L"EffectWindow", L"Ratio", std::to_wstring(DisplayRatio).c_str(), path);
+				}
+			}
 		}
 		if (Cursor->range.Type == 0) {
 			DisplayRatio -= Cursor->move.y / Cursor->range.Range[L"EffectsList"].bottom;
@@ -1120,6 +1190,11 @@ bool P_Effects::Update(CUR *Cursor) {
 		HideAnime = (float)Hide;
 	}
 
+	HideNum += ((float)HideNumF - HideNum) / 3.5f;
+	if (abs(HideNum - (float)HideNumF) < 0.001) {
+		HideNum = (float)HideNumF;
+	}
+
 	float y = 5.0f + 3.0f - PageY;
 	bool open = false;
 	bool item = false;
@@ -1145,7 +1220,7 @@ bool P_Effects::Update(CUR *Cursor) {
 			y += 30.0f + 100.0f * e.Use * e.Open;
 		}
 	}
-	if (PageY != PageYF || HideButtonHoverAnime != (float)HideButtonHover || HideAnime !=(float)Hide || RatioHoverAnime != (float)RatioHover) {
+	if (PageY != PageYF || HideButtonHoverAnime != (float)HideButtonHover || HideAnime !=(float)Hide || RatioHoverAnime != (float)RatioHover || HideNum != (float)HideNumF) {
 		Return = true;
 	}
 	AnimeMoving = Return;
@@ -1159,9 +1234,10 @@ void P_Effects::Draw(CUR *Cursor) {
 		Rect,
 		D2D1_ANTIALIAS_MODE_PER_PRIMITIVE
 	);
-
 	g_pBrush->SetColor(D2D1::ColorF(config->get_color_code(config, "Grouping")));
 	g_pRenderTarget->FillRectangle(Rect, g_pBrush);
+	g_pBrush->SetColor(D2D1::ColorF(config->get_color_code(config, "Border")));
+	g_pRenderTarget->FillRectangle(D2D1::RectF(Rect.left, Rect.top, Rect.right, Rect.top + 1.25f), g_pBrush);
 
 	float RectYRange = (Rect.bottom - Rect.top);
 	float ScrollRatio;
@@ -1204,17 +1280,12 @@ void P_Effects::Draw(CUR *Cursor) {
 
 	D2D1_RECT_F RatioRect = Cursor->range.Range[L"EffectsListRatio"];
 	g_pBrush->SetColor(D2D1::ColorF(config->get_color_code(config, "BorderFocus"), (std::max)(RatioHoverAnime, (float)RatioClicking)));
-	g_pRenderTarget->FillRectangle(RatioRect, g_pBrush);
+	g_pRenderTarget->FillRectangle(D2D1::RectF(Rect.left, Rect.top, Rect.right, Rect.top + 1.25f), g_pBrush);
 
 	D2D1_RECT_F HideButtonRect = Cursor->range.Range[L"EffectsListHide"];
 	g_pBrush->SetColor(D2D1::ColorF(config->get_color_code(config, "Background")));
 	g_pRenderTarget->FillRectangle(HideButtonRect, g_pBrush);
 	g_pBrush->SetColor(D2D1::ColorF(0xffffff, HideButtonHoverAnime * 0.1f));
 	g_pRenderTarget->FillRectangle(HideButtonRect, g_pBrush);
-	if (HideButtonRect.bottom - HideButtonRect.top < HideButtonRect.right - HideButtonRect.left) {
-		Draw_Svg(331, HideButtonRect, 0.5f, 180.0f * !Hide, D2D1::ColorF(config->get_color_code(config, "Text")));
-	}
-	else {
-		Draw_Svg(331, HideButtonRect, 0.5f, 180.0f * !Hide - 90.0f, D2D1::ColorF(config->get_color_code(config, "Text")));
-	}
+	Draw_Svg(331, HideButtonRect, 0.5f, HideNum * -180.0f - 180.0f, D2D1::ColorF(config->get_color_code(config, "Text")));
 }
