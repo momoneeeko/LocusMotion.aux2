@@ -695,7 +695,7 @@ EXTERN_C __declspec(dllexport) void RegisterPlugin(HOST_APP_TABLE* host) {
 			//iniÉtÉ@ÉCÉãçÏê¨
 			WritePrivateProfileStringW(L"EffectWindow", L"Hide", std::to_wstring(Effects.Hide).c_str(), path);
 			WritePrivateProfileStringW(L"EffectWindow", L"Ratio", std::to_wstring(Effects.DisplayRatio).c_str(), path);
-			WritePrivateProfileStringW(L"EffectWindow", L"RatioLock", std::to_wstring(Effects.DisplayRatio).c_str(), path);
+			WritePrivateProfileStringW(L"EffectWindow", L"RatioLock", std::to_wstring(Effects.RatioLock).c_str(), path);
 		}
 	}
 }
