@@ -195,7 +195,7 @@ struct RANGE {
 	void Update(D2D1_RECT_F Window, float DisplayRatio) {
 		float Width = (Window.right - Window.left);
 		float Height = (Window.bottom - Window.top);
-		if (Width < Height) {
+		if (Width < Height) { //縦長
 			Type = 0;
 			//エフェクトリスト
 			Range[L"EffectsList"] = D2D1::RectF(0.0f, (Height - 30.0f) * DisplayRatio + 5.0f, Width, Height - 30.0f);
@@ -206,7 +206,7 @@ struct RANGE {
 			//エディタ全体
 			Range[L"Locus"] = D2D1::RectF(0.0f, 0.0f, Width, (Height - 30.0f) * DisplayRatio);
 		}
-		else {
+		else { //横長
 			Type = 1;
 			Range[L"EffectsList"] = D2D1::RectF((Width - 30.0f) * DisplayRatio + 5.0f, 0.0f, Width - 30.0f, Height);
 			Range[L"EffectsListHide"] = D2D1::RectF(Range[L"EffectsList"].right, Range[L"EffectsList"].top, Range[L"EffectsList"].right + 30.0f, Range[L"EffectsList"].bottom);

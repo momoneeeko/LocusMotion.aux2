@@ -255,6 +255,7 @@ double LOCUSES::PlayModifier(double x, double Time, double framerate, int n) {
     double t = x;
     double out = 0.0;
     double Trans = 0.1;
+
     //前半モディファイア
     for (int i = 0; i < Modifier.size(); i++) {
         switch (Modifier[i].Mode) {
@@ -264,6 +265,12 @@ double LOCUSES::PlayModifier(double x, double Time, double framerate, int n) {
             t = (floor((t * Time - p) / v) * v + p) / Time;
             break;
         }
+        }
+    }
+
+    //中間モディファイア
+    for (int i = 0; i < Modifier.size(); i++) {
+        switch (Modifier[i].Mode) {
         case 4: {
             if (t != 1.0) {
                 t = fmod(x * Modifier[i].Param[0], 1.0);
@@ -271,12 +278,12 @@ double LOCUSES::PlayModifier(double x, double Time, double framerate, int n) {
             break;
         }
         case 5: {
-            t = fmod(x * Modifier[i].Param[0], 1.0);
+            t = fmod(t * Modifier[i].Param[0], 1.0);
             t = (t <= 0.5) ? t * 2.0 : 1.0 - (t - 0.5) * 2.0;
             break;
         }
         case 6: {
-            t = fmod(x * Modifier[i].Param[0], 1.0);
+            t = fmod(t * Modifier[i].Param[0], 1.0);
             break;
         }
         }
@@ -314,6 +321,7 @@ double LOCUSES::PlayModifier(double x, double Time, double framerate, int n) {
         }
         case 6: {
             out = (out + floor(x * Modifier[i].Param[0])) / Modifier[i].Param[0];
+            break;
         }
         }
     }

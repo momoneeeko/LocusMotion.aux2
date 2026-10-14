@@ -149,7 +149,6 @@ void DiscardDeviceResources() {
 	if (g_pRenderTarget) { g_pRenderTarget->Release(); g_pRenderTarget = nullptr; }
 	if (g_pTextFormat) { g_pTextFormat->Release(); g_pTextFormat = nullptr; }
 	if (g_pDWriteFactory) { g_pDWriteFactory->Release(); g_pDWriteFactory = nullptr; }
-	if (g_pD2DFactory) { g_pD2DFactory->Release(); g_pD2DFactory = nullptr; }
 }
 
 

@@ -23,7 +23,7 @@ HCURSOR hDragCursor = NULL;
 //---------------------------------------------------------------------
 COMMON_PLUGIN_TABLE common_plugin_table = {
 	L"LocusMotion",								// プラグインの名前
-	L"LocusMotion β5.0 もも猫(@momo_neeeko)",		// プラグインの情報
+	L"LocusMotion β5.1.3 もも猫(@momo_neeeko)",		// プラグインの情報
 };
 
 //---------------------------------------------------------------------
@@ -82,6 +82,7 @@ P_Effects Effects;
 LOCUSDATA LocusData;
 HWND g_hPluginWnd = NULL;
 bool WindowResize = true;
+std::filesystem::path g_iniPath;
 
 void OnEvent(void* param) {
 	HWND hwnd = (HWND)param;
@@ -364,7 +365,7 @@ SCRIPT_MODULE_FUNCTION functions[] = {
 };
 
 SCRIPT_MODULE_TABLE script_module_table = {
-	L"LocusMotion β5.0 もも猫(@momo_neeeko)",
+	L"LocusMotion β5.1.3 もも猫(@momo_neeeko)",
 	functions
 };
 
@@ -621,6 +622,27 @@ EXTERN_C __declspec(dllexport) void RegisterPlugin(HOST_APP_TABLE* host) {
 		&hModule
 	);
 
+	//config.ini関係
+	wchar_t dllPath[MAX_PATH];
+	GetModuleFileNameW(hModule, dllPath, MAX_PATH);
+	g_iniPath = std::filesystem::path(dllPath).parent_path() / L"config.ini";
+	const wchar_t* path = g_iniPath.c_str();
+	wchar_t buffer[256];
+	GetPrivateProfileStringW(L"EffectWindow", L"Hide", L"0", buffer, 256, path);
+	int Hide = _wtoi(buffer);
+	GetPrivateProfileStringW(L"EffectWindow", L"Ratio", L"0.45", buffer, 256, path);
+	float Ratio = wcstod(buffer, nullptr);
+	GetPrivateProfileStringW(L"EffectWindow", L"RatioLock", L"0", buffer, 256, path);
+	int RatioLock = _wtoi(buffer);
+	Effects.Hide = Hide;
+	Effects.HideAnime = Hide;
+	Effects.DisplayRatio = Ratio;
+	Effects.RatioLock = RatioLock;
+	WritePrivateProfileStringW(L"EffectWindow", L"Hide", std::to_wstring(Effects.Hide).c_str(), path);
+	WritePrivateProfileStringW(L"EffectWindow", L"Ratio", std::to_wstring(Effects.DisplayRatio).c_str(), path);
+	WritePrivateProfileStringW(L"EffectWindow", L"RatioLock", std::to_wstring(Effects.RatioLock).c_str(), path);
+
+
 	hDragCursor = LoadCursor(hModule, MAKEINTRESOURCE(ID_CURSOR_DRAG));
 
 	WNDCLASSEXW wcex = {};
@@ -670,34 +692,6 @@ EXTERN_C __declspec(dllexport) void RegisterPlugin(HOST_APP_TABLE* host) {
 		false,
 		ProcApplyEditorLocusItemMenu
 	);
-
-	//ini関係
-	if (config && config->app_data_path) {
-		std::filesystem::path dirPath = std::filesystem::path(config->app_data_path) / L"Plugin" / L"LocusMotion";
-		std::error_code ec;
-		std::filesystem::create_directories(dirPath, ec);
-		if (!ec) {
-			std::filesystem::path iniPath = dirPath / L"config.ini";
-			const wchar_t* path = iniPath.c_str();
-			//iniファイル読み込み
-			wchar_t buffer[256];
-			GetPrivateProfileStringW(L"EffectWindow", L"Hide", L"0", buffer, 256, path);
-			int Hide = _wtoi(buffer);
-			GetPrivateProfileStringW(L"EffectWindow", L"Ratio", L"0.45", buffer, 256, path);
-			float Ratio = wcstod(buffer, nullptr);
-			GetPrivateProfileStringW(L"EffectWindow", L"RatioLock", L"0", buffer, 256, path);
-			int RatioLock = wcstod(buffer, nullptr);
-			Effects.Hide = Hide;
-			Effects.HideAnime = Hide;
-			Effects.DisplayRatio = Ratio;
-			Effects.RatioLock = RatioLock;
-
-			//iniファイル作成
-			WritePrivateProfileStringW(L"EffectWindow", L"Hide", std::to_wstring(Effects.Hide).c_str(), path);
-			WritePrivateProfileStringW(L"EffectWindow", L"Ratio", std::to_wstring(Effects.DisplayRatio).c_str(), path);
-			WritePrivateProfileStringW(L"EffectWindow", L"RatioLock", std::to_wstring(Effects.RatioLock).c_str(), path);
-		}
-	}
 }
 
 //---------------------------------------------------------------------

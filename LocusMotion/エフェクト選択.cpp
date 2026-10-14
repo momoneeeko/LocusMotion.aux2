@@ -11,6 +11,8 @@
 
 #include <random>
 
+extern std::filesystem::path g_iniPath;
+
 std::random_device rd;
 std::mt19937 gen(rd());
 
@@ -1078,15 +1080,8 @@ bool P_Effects::Update(CUR *Cursor) {
 		Hide = !Hide;
 		HideNumF += 1;
 		//iniŠÖŒW
-		if (config && config->app_data_path) {
-			std::filesystem::path dirPath = std::filesystem::path(config->app_data_path) / L"Plugin" / L"LocusMotion";
-			std::error_code ec;
-			std::filesystem::create_directories(dirPath, ec);
-			if (!ec) {
-				std::filesystem::path iniPath = dirPath / L"config.ini";
-				const wchar_t* path = iniPath.c_str();
-				WritePrivateProfileStringW(L"EffectWindow", L"Hide", std::to_wstring(Hide).c_str(), path);
-			}
+		if (!g_iniPath.empty()) {
+			WritePrivateProfileStringW(L"EffectWindow", L"Hide", std::to_wstring(Hide).c_str(), g_iniPath.c_str());
 		}
 		Return = true;
 	}
@@ -1123,15 +1118,8 @@ bool P_Effects::Update(CUR *Cursor) {
 				case 101:
 				{
 					RatioLock = !RatioLock;
-					if (config && config->app_data_path) {
-						std::filesystem::path dirPath = std::filesystem::path(config->app_data_path) / L"Plugin" / L"LocusMotion";
-						std::error_code ec;
-						std::filesystem::create_directories(dirPath, ec);
-						if (!ec) {
-							std::filesystem::path iniPath = dirPath / L"config.ini";
-							const wchar_t* path = iniPath.c_str();
-							WritePrivateProfileStringW(L"EffectWindow", L"RatioLock", std::to_wstring(RatioLock).c_str(), path);
-						}
+					if (!g_iniPath.empty()) {
+						WritePrivateProfileStringW(L"EffectWindow", L"RatioLock", std::to_wstring(RatioLock).c_str(), g_iniPath.c_str());
 					}
 					break;
 				}
@@ -1144,15 +1132,8 @@ bool P_Effects::Update(CUR *Cursor) {
 	if (RatioClicking) {
 		if (!Cursor->clicking) {
 			RatioClicking = false;
-			if (config && config->app_data_path) {
-				std::filesystem::path dirPath = std::filesystem::path(config->app_data_path) / L"Plugin" / L"LocusMotion";
-				std::error_code ec;
-				std::filesystem::create_directories(dirPath, ec);
-				if (!ec) {
-					std::filesystem::path iniPath = dirPath / L"config.ini";
-					const wchar_t* path = iniPath.c_str();
-					WritePrivateProfileStringW(L"EffectWindow", L"Ratio", std::to_wstring(DisplayRatio).c_str(), path);
-				}
+			if (!g_iniPath.empty()) {
+				WritePrivateProfileStringW(L"EffectWindow", L"Ratio", std::to_wstring(DisplayRatio).c_str(), g_iniPath.c_str());
 			}
 		}
 		if (Cursor->range.Type == 0) {
@@ -1280,12 +1261,17 @@ void P_Effects::Draw(CUR *Cursor) {
 
 	D2D1_RECT_F RatioRect = Cursor->range.Range[L"EffectsListRatio"];
 	g_pBrush->SetColor(D2D1::ColorF(config->get_color_code(config, "BorderFocus"), (std::max)(RatioHoverAnime, (float)RatioClicking)));
-	g_pRenderTarget->FillRectangle(D2D1::RectF(Rect.left, Rect.top, Rect.right, Rect.top + 1.25f), g_pBrush);
+	if (Cursor->range.Type == 0) {
+		g_pRenderTarget->FillRectangle(D2D1::RectF(Rect.left, Rect.top, Rect.right, Rect.top + 1.25f), g_pBrush);
+	}
+	else {
+		g_pRenderTarget->FillRectangle(D2D1::RectF(Rect.left, Rect.top, Rect.left + 1.25f, Rect.bottom), g_pBrush);
+	}
 
 	D2D1_RECT_F HideButtonRect = Cursor->range.Range[L"EffectsListHide"];
 	g_pBrush->SetColor(D2D1::ColorF(config->get_color_code(config, "Background")));
 	g_pRenderTarget->FillRectangle(HideButtonRect, g_pBrush);
 	g_pBrush->SetColor(D2D1::ColorF(0xffffff, HideButtonHoverAnime * 0.1f));
 	g_pRenderTarget->FillRectangle(HideButtonRect, g_pBrush);
-	Draw_Svg(331, HideButtonRect, 0.5f, HideNum * -180.0f - 180.0f, D2D1::ColorF(config->get_color_code(config, "Text")));
+	Draw_Svg(331, HideButtonRect, 0.5f, HideNum * (Cursor->range.Type == 0 ? -180.0f : 180.0f) - 180.0f + -90.0f * Cursor->range.Type, D2D1::ColorF(config->get_color_code(config, "Text")));
 }
