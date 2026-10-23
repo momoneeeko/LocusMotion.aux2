@@ -99,6 +99,29 @@ struct MODIFIER {
 			}
 			break;
 		}
+		case 7: {	//波形合成
+			Param.push_back(10.0);	// 波長
+			Param.push_back(1.0);	// 0=波長, 1=周波数
+			Param.push_back(10.0);	// 振れ幅
+			Param.push_back(0.0);	// 位相
+			Param.push_back(0.0);	// 0=度数法, 1=弧度法
+			Param.push_back(0.0);	// 0=正弦波, 2=三角波, 3=矩形波, 4=ノコギリ波, 5=正弦波の絶対値
+			for (int i = 0; i < 6; i++) {
+				ParamHover.push_back(false);
+				ParamHoverAnime.push_back(0.0f);
+				ParamUse.push_back(false);
+			}
+			break;
+		}
+		case 8: {	//積分
+			Param.push_back(100.0);	// 精度
+			for (int i = 0; i < 1; i++) {
+				ParamHover.push_back(false);
+				ParamHoverAnime.push_back(0.0f);
+				ParamUse.push_back(false);
+			}
+			break;
+		}
 		}
 	}
 
@@ -190,28 +213,49 @@ extern LOCUSDATA LocusData;
 
 struct RANGE {
 	std::map<std::wstring,D2D1_RECT_F> Range;
-	int Type = 0;		//0=縦長, 1=横長
+	int Type = 0;		//0=縦長(下), 1=横長(右), 2=縦長(上), 3=横長(左)
+	int PosType = 0;	//0=下・右, 1=上・左
+	float Width = 500.0f;
+	float Height = 500.0f;
 
 	void Update(D2D1_RECT_F Window, float DisplayRatio) {
-		float Width = (Window.right - Window.left);
-		float Height = (Window.bottom - Window.top);
+		Width = (Window.right - Window.left);
+		Height = (Window.bottom - Window.top);
 		if (Width < Height) { //縦長
-			Type = 0;
-			//エフェクトリスト
-			Range[L"EffectsList"] = D2D1::RectF(0.0f, (Height - 30.0f) * DisplayRatio + 5.0f, Width, Height - 30.0f);
-			//エフェクトリストを隠すボタン
-			Range[L"EffectsListHide"] = D2D1::RectF(Range[L"EffectsList"].left, Range[L"EffectsList"].bottom, Range[L"EffectsList"].right, Range[L"EffectsList"].bottom + 30.0f);
-			//エフェクトリストの表示比率を変える範囲
-			Range[L"EffectsListRatio"] = D2D1::RectF(Range[L"EffectsList"].left, Range[L"EffectsList"].top, Range[L"EffectsList"].right, Range[L"EffectsList"].top + 5.0f);
-			//エディタ全体
-			Range[L"Locus"] = D2D1::RectF(0.0f, 0.0f, Width, (Height - 30.0f) * DisplayRatio);
+			if (PosType == 0) {
+				Type = 0;
+				//エフェクトリスト
+				Range[L"EffectsList"] = D2D1::RectF(0.0f, (Height - 30.0f) * DisplayRatio, Width, Height - 30.0f);
+				//エフェクトリストを隠すボタン
+				Range[L"EffectsListHide"] = D2D1::RectF(Range[L"EffectsList"].left, Range[L"EffectsList"].bottom, Range[L"EffectsList"].right, Range[L"EffectsList"].bottom + 30.0f);
+				//エフェクトリストの表示比率を変える範囲
+				Range[L"EffectsListRatio"] = D2D1::RectF(Range[L"EffectsList"].left, Range[L"EffectsList"].top - 5.0f, Range[L"EffectsList"].right, Range[L"EffectsList"].top);
+				//エディタ全体
+				Range[L"Locus"] = D2D1::RectF(0.0f, 0.0f, Width, (Height - 30.0f) * DisplayRatio);
+			}
+			else {
+				Type = 2;
+				Range[L"EffectsList"] = D2D1::RectF(0.0f, 30.0f, Width, (Height - 30.0f) * (1.0f - DisplayRatio) + 30.0f);
+				Range[L"EffectsListHide"] = D2D1::RectF(Range[L"EffectsList"].left, Range[L"EffectsList"].top - 30.0f, Range[L"EffectsList"].right, Range[L"EffectsList"].top);
+				Range[L"EffectsListRatio"] = D2D1::RectF(Range[L"EffectsList"].left, Range[L"EffectsList"].bottom, Range[L"EffectsList"].right, Range[L"EffectsList"].bottom + 5.0f);
+				Range[L"Locus"] = D2D1::RectF(0.0f, (Height - 30.0f) * (1.0f - DisplayRatio) + 30.0f, Width, Height);
+			}
 		}
 		else { //横長
-			Type = 1;
-			Range[L"EffectsList"] = D2D1::RectF((Width - 30.0f) * DisplayRatio + 5.0f, 0.0f, Width - 30.0f, Height);
-			Range[L"EffectsListHide"] = D2D1::RectF(Range[L"EffectsList"].right, Range[L"EffectsList"].top, Range[L"EffectsList"].right + 30.0f, Range[L"EffectsList"].bottom);
-			Range[L"EffectsListRatio"] = D2D1::RectF(Range[L"EffectsList"].left, Range[L"EffectsList"].top, Range[L"EffectsList"].left + 5.0f, Range[L"EffectsList"].bottom);
-			Range[L"Locus"] = D2D1::RectF(0.0f, 0.0f, (Width - 30.0f) * DisplayRatio, Height);
+			if (PosType == 0) {
+				Type = 1;
+				Range[L"EffectsList"] = D2D1::RectF((Width - 30.0f) * DisplayRatio, 0.0f, Width - 30.0f, Height);
+				Range[L"EffectsListHide"] = D2D1::RectF(Range[L"EffectsList"].right, Range[L"EffectsList"].top, Range[L"EffectsList"].right + 30.0f, Range[L"EffectsList"].bottom);
+				Range[L"EffectsListRatio"] = D2D1::RectF(Range[L"EffectsList"].left, Range[L"EffectsList"].top, Range[L"EffectsList"].left + 5.0f, Range[L"EffectsList"].bottom);
+				Range[L"Locus"] = D2D1::RectF(0.0f, 0.0f, (Width - 30.0f) * DisplayRatio, Height);
+			}
+			else {
+				Type = 3;
+				Range[L"EffectsList"] = D2D1::RectF(30.0f, 0.0f, (Width - 30.0f) * (1.0f - DisplayRatio) + 30.0f, Height);
+				Range[L"EffectsListHide"] = D2D1::RectF(Range[L"EffectsList"].left - 30.0f, Range[L"EffectsList"].top, Range[L"EffectsList"].left, Range[L"EffectsList"].bottom);
+				Range[L"EffectsListRatio"] = D2D1::RectF(Range[L"EffectsList"].right - 5.0f, Range[L"EffectsList"].top, Range[L"EffectsList"].right, Range[L"EffectsList"].bottom);
+				Range[L"Locus"] = D2D1::RectF((Width - 30.0f) * (1.0f - DisplayRatio) + 30.0f, 0.0f, Width, Height);
+			}
 		}
 		//エディタの曲線表示部分
 		Range[L"LocusEditor"] = D2D1::RectF(Range[L"Locus"].left, Range[L"Locus"].top + 40.0f, Range[L"Locus"].right, Range[L"Locus"].bottom - 40.0f);
@@ -272,7 +316,7 @@ struct LOCUS_UI {
 
 class EDIT_LOCUSES {
 public:
-	int Tipe = 0;			//0=単体, 1=最初, 2=中間, 3=最後
+	int Type = 0;			//0=単体, 1=最初, 2=中間, 3=最後
 	mutable int Mode = 0;			//0=ベジェ, 1=エラスティック, 2,バウンス
 	mutable LOCUS Locus[4];
 	mutable LOCUS_UI LocusUI[4];
@@ -346,13 +390,16 @@ public:
 	std::wstring Name;         // エフェクト・項目名
 	std::wstring Tipe;         // エフェクトか項目か
 	mutable bool Hover = false;
+	mutable bool Focus = false;		//ドラッグ中ホバー
 	mutable float HoverAnime = 0.0f;
 	mutable bool Open = false;  // 表示非表示
 	mutable float OpenAnime = 0.0f;
 	mutable bool Use = false;          // 軌跡が設定済みか
 	mutable bool UseElse = false;		//別のトラックバー移動モードが設定されている。
+	mutable int EffectNum = -1;		//所属しているエフェクトの番号
+	mutable std::vector<std::wstring> GroupItems;
 
-	mutable int LocusID = 0;
+	mutable int LocusID = -1;
 	mutable bool InitialLocusID = false;	//IDが初期値の-1の時にtrue
 	mutable bool ChangeLocus = false;		//"エディタの曲線を適用"チェックボックスが1の時にtrue
 	mutable int SectionNum = 1;
@@ -379,7 +426,7 @@ public:
 	}
 
 	void UpdateGeometry(LOCUSES Locus, D2D1_RECT_F Rect, int Section, float normS, float normE) const;
-	bool Update(D2D1_RECT_F rect, CUR *Cursor) const;
+	bool Update(D2D1_RECT_F Rect, CUR* Cursor, int* Group) const;
 	bool Locus_Update(D2D1_RECT_F Rect, CUR *Cursor) const;
 	void Draw(D2D1_RECT_F Rect, CUR* Cursor) const;
 	void Locus_Draw(D2D1_RECT_F Rect, CUR* Cursor) const;
@@ -390,7 +437,7 @@ public:
 
 class P_Effects {
 public:
-	OBJECT_HANDLE ObjectHandle;
+	OBJECT_HANDLE ObjectHandle = {};
 	std::vector<P_Effect> Effect;
 	std::vector<CLOCUS> Locus;
 	float PageY = 0.0f;
@@ -411,6 +458,7 @@ public:
 	int HideNumF = 0;
 	bool HideButtonHover = false;
 	float HideButtonHoverAnime = 0.0f;
+	bool DragHover = false;
 
 	float DisplayRatio = 0.45f;		//エディタとエフェクト一覧の割合
 	bool RatioLock = false;
@@ -419,6 +467,7 @@ public:
 	bool RatioClicking = false;
 
 	void GetObjectEffects();
+	void SetTrackbars(int LocusID, std::vector<P_Effect>* Item);
 	bool Update(CUR *Cursor);
 	void Draw(CUR *Cursor);
 };

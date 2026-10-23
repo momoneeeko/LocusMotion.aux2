@@ -9,9 +9,6 @@
 
 #define PI 3.14159265359f
 
-
-
-
 bool EDIT_LOCUSES::Update(D2D1_RECT_F Rect, CUR* Cursor, D2D1_POINT_2F OllCenter, float Size, const EDIT_LOCUSES* prevLocus, const EDIT_LOCUSES* nextLocus, bool* NoHover) const {
 	bool Return = false;
 	Center = D2D1::Point2(((Locus[Mode].S.x + Locus[Mode].F.x) - 1.0f) * Size + OllCenter.x, (-(Locus[Mode].S.y + Locus[Mode].F.y) + 1.0f) * Size + OllCenter.y);
@@ -63,21 +60,51 @@ bool EDIT_LOCUSES::Update(D2D1_RECT_F Rect, CUR* Cursor, D2D1_POINT_2F OllCenter
 				*NoHover = false;
 				if (Cursor->click)
 					LocusUI[Mode].S.Clicking = true;
+				if (Cursor->rclick) {
+					if (Type == 3 || Type == 2) {
+						Cursor->rclick = false;
+						ValueInputWindow(Cursor->hwnd, L"値入力", *Cursor, Locus[Mode], 0);
+					}
+				}
 			}
 			else if (CheckHit(H1Point, LocusUI[Mode].H1, *Cursor)) {
 				*NoHover = false;
 				if (Cursor->click)
 					LocusUI[Mode].H1.Clicking = true;
+				if (Cursor->rclick) {
+					Cursor->rclick = false;
+					if (Mode == 1 || Mode == 2) {
+						ValueInputWindow(Cursor->hwnd, L"値入力", *Cursor, Locus[Mode], 4);
+					}
+					else {
+						ValueInputWindow(Cursor->hwnd, L"値入力", *Cursor, Locus[Mode], 1);
+					}
+				}
 			}
 			else if (CheckHit(H2Point, LocusUI[Mode].H2, *Cursor)) {
 				*NoHover = false;
 				if (Cursor->click)
 					LocusUI[Mode].H2.Clicking = true;
+				if (Cursor->rclick) {
+					Cursor->rclick = false;
+					if (Mode == 1 || Mode == 2) {
+						ValueInputWindow(Cursor->hwnd, L"値入力", *Cursor, Locus[Mode], 5);
+					}
+					else {
+						ValueInputWindow(Cursor->hwnd, L"値入力", *Cursor, Locus[Mode], 2);
+					}
+				}
 			}
 			else if (CheckHit(FPoint, LocusUI[Mode].F, *Cursor)) {
 				*NoHover = false;
 				if (Cursor->click)
 					LocusUI[Mode].F.Clicking = true;
+				if (Cursor->rclick) {
+					if (Type == 1 || Type == 2) {
+						Cursor->rclick = false;
+						ValueInputWindow(Cursor->hwnd, L"値入力", *Cursor, Locus[Mode], 3);
+					}
+				}
 			}
 		}
 	}
@@ -96,15 +123,33 @@ bool EDIT_LOCUSES::Update(D2D1_RECT_F Rect, CUR* Cursor, D2D1_POINT_2F OllCenter
 				float prevS_x = prevLocus ? prevLocus->Locus[Mode].S.x : 0.0f;
 				float nextF_x = nextLocus ? nextLocus->Locus[Mode].F.x : 1.0f;
 
-				float minSx = (Tipe == 0 || Tipe == 1) ? 0.0f : prevS_x;
-				float maxFx = (Tipe == 0 || Tipe == 3) ? 1.0f : nextF_x;
-				if ( Mode == 0) {
-					if (PosTipe == 0) {
-						if (!(Tipe == 0)) {
-							if (Tipe == 2 || Tipe == 3) { pos.x = (std::min)((std::max)(x, minSx), Locus[Mode].F.x); }
-							if (Tipe == 2 || Tipe == 3) { pos.y = y; }
+				float minSx = (Type == 0 || Type == 1) ? 0.0f : prevS_x;
+				float maxFx = (Type == 0 || Type == 3) ? 1.0f : nextF_x;
+				if (PosTipe == 0) {
+					if (!(Type == 0)) {
+						if (GetAsyncKeyState(VK_SHIFT) & 0x8000) {
+							if (Type == 2 || Type == 3) { pos.x = (std::min)((std::max)(round(x * 10.0f) / 10.0f, minSx), Locus[Mode].F.x); }
+							if (Type == 2 || Type == 3) { pos.y = round(y * 10.0f) / 10.0f; }
+						}
+						else {
+							if (Type == 2 || Type == 3) { pos.x = (std::min)((std::max)(x, minSx), Locus[Mode].F.x); }
+							if (Type == 2 || Type == 3) { pos.y = y; }
 						}
 					}
+				}
+				else if (PosTipe == 3) {
+					if (!(Type == 0)) {
+						if (GetAsyncKeyState(VK_SHIFT) & 0x8000) {
+							if (Type == 2 || Type == 1) { pos.x = (std::min)((std::max)(round(x * 10.0f) / 10.0f, Locus[Mode].S.x), maxFx); }
+							if (Type == 2 || Type == 1) { pos.y = round(y * 10.0f) / 10.0f; }
+						}
+						else {
+							if (Type == 2 || Type == 1) { pos.x = (std::min)((std::max)(x, Locus[Mode].S.x), maxFx); }
+							if (Type == 2 || Type == 1) { pos.y = y; }
+						}
+					}
+				}
+				else if ( Mode == 0) {
 					if (PosTipe == 1) {
 						pos.x = (std::min)((std::max)(x, 0.0f), 1.0f);
 						if (GetAsyncKeyState(VK_SHIFT) & 0x8000) {
@@ -139,20 +184,8 @@ bool EDIT_LOCUSES::Update(D2D1_RECT_F Rect, CUR* Cursor, D2D1_POINT_2F OllCenter
 							Locus[Mode].H1.y = 1.0f - pos.x;
 						}
 					}
-					if (PosTipe == 3) {
-						if (!(Tipe == 0)) {
-							if (Tipe == 2 || Tipe == 1) { pos.x = (std::min)((std::max)(x, Locus[Mode].S.x), maxFx); }
-							if (Tipe == 2 || Tipe == 1) { pos.y = y; }
-						}
-					}
 				}
 				else if ( Mode == 1) {
-					if (PosTipe == 0) {
-						if (!(Tipe == 0)) {
-							if (Tipe == 2 || Tipe == 3) { pos.x = (std::min)((std::max)(x, minSx), Locus[Mode].F.x); }
-							if (Tipe == 2 || Tipe == 3) { pos.y = y; }
-						}
-					}
 					if (PosTipe == 1) {
 						if (GetAsyncKeyState(VK_SHIFT) & 0x8000) {
 							pos.y = (std::min)((std::max)((round(atan2((std::max)(x, 0.0f), -y) / (PI / 12.0f)) * (PI / 12.0f) / PI * 1.8f - 0.9f), -0.8999f), 0.8999f);
@@ -165,20 +198,8 @@ bool EDIT_LOCUSES::Update(D2D1_RECT_F Rect, CUR* Cursor, D2D1_POINT_2F OllCenter
 						pos.x = (std::min)((std::max)(x, 0.0f), 0.999f);
 						pos.y = (std::min)((std::max)(y, 0.0f), 1.0f);
 					}
-					if (PosTipe == 3) {
-						if (!(Tipe == 0)) {
-							if (Tipe == 2 || Tipe == 1) { pos.x = (std::min)((std::max)(x, Locus[Mode].S.x), maxFx); }
-							if (Tipe == 2 || Tipe == 1) { pos.y = y; }
-						}
-					}
 				}
 				else if ( Mode == 2) {
-					if (PosTipe == 0) {
-						if (!(Tipe == 0)) {
-							if (Tipe == 2 || Tipe == 3) { pos.x = (std::min)((std::max)(x, minSx), Locus[Mode].F.x); }
-							if (Tipe == 2 || Tipe == 3) { pos.y = y; }
-						}
-					}
 					if (PosTipe == 1) {
 						if (GetAsyncKeyState(VK_SHIFT) & 0x8000) {
 							pos.y = (std::min)((std::max)((round(atan2((std::max)(x, 0.0f), -y) / (PI / 12.0f)) * (PI / 12.0f) / PI * 1.8f - 0.9f), -0.8999f), 0.8999f);
@@ -190,26 +211,6 @@ bool EDIT_LOCUSES::Update(D2D1_RECT_F Rect, CUR* Cursor, D2D1_POINT_2F OllCenter
 					if (PosTipe == 2) {
 						pos.x = (std::min)((std::max)(x, 0.0f), 1.0f);
 						pos.y = (std::min)((std::max)(y, 0.0001f), 0.9999f);
-					}
-					if (PosTipe == 3) {
-						if (!(Tipe == 0)) {
-							if (Tipe == 2 || Tipe == 1) { pos.x = (std::min)((std::max)(x, Locus[Mode].S.x), maxFx); }
-							if (Tipe == 2 || Tipe == 1) { pos.y = y; }
-						}
-					}
-				}
-				else if (Mode == 3) {
-					if (PosTipe == 0) {
-						if (!(Tipe == 0)) {
-							if (Tipe == 2 || Tipe == 3) { pos.x = (std::min)((std::max)(x, minSx), Locus[Mode].F.x); }
-							if (Tipe == 2 || Tipe == 3) { pos.y = y; }
-						}
-					}
-					if (PosTipe == 3) {
-						if (!(Tipe == 0)) {
-							if (Tipe == 2 || Tipe == 1) { pos.x = (std::min)((std::max)(x, Locus[Mode].S.x), maxFx); }
-							if (Tipe == 2 || Tipe == 1) { pos.y = y; }
-						}
 					}
 				}
 				Return = true;
@@ -268,12 +269,12 @@ void EDIT_LOCUSES::Draw(D2D1_RECT_F Rect, D2D1_POINT_2F OllCenter, float Size, c
 	}
 		UpdateGeometry(Size, OllCenter);
 		UpdateLocus = false;
-	if (Selected && Tipe != 0) {
+	if (Selected && Type != 0) {
 		g_pBrush->SetColor(D2D1::ColorF(config->get_color_code(config, "Anchor"), 0.05f));
 		g_pRenderTarget->FillRectangle(D2D1::RectF(SPoint.x, SPoint.y, FPoint.x, FPoint.y), g_pBrush);
 	}
 
-	g_pBrush->SetColor(D2D1::ColorF((Selected && Tipe != 0) ? 0x79abed : 0x54d1ff));
+	g_pBrush->SetColor(D2D1::ColorF((Selected && Type != 0) ? 0x79abed : 0x54d1ff));
 	g_pRenderTarget->DrawGeometry(Geometry.Get(), g_pBrush, 3.0f);
 
 	if ( Mode == 0) {
@@ -428,142 +429,6 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 	bool Return = LocusUpdate;
 	NoHover = true;
 
-	if (Cursor->rclick && Cursor->RangeCheck(L"LocusEditor")) {
-		Cursor->rclick = false;
-		HMENU hMenu = CreatePopupMenu();
-		if (hMenu) {
-			AppendMenuW(hMenu, MF_STRING, 101, L"反転");
-			AppendMenuW(hMenu, MF_STRING, 102, L"全て反転");
-			AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
-			AppendMenuW(hMenu, MF_STRING, 103, L"コピー");
-			if(UseCopy){
-				AppendMenuW(hMenu, MF_STRING, 104, L"貼り付け");
-			}
-			else {
-				AppendMenuW(hMenu, MF_STRING | MF_GRAYED, 104, L"貼り付け");
-			}
-			AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
-			AppendMenuW(hMenu, MF_STRING, 105, L"イージングを選択");
-			AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
-			if (Locus.size() == 1) {
-				AppendMenuW(hMenu, MF_STRING | MF_GRAYED, 106, L"削除");
-			}
-			else {
-				AppendMenuW(hMenu, MF_STRING, 106, L"削除");
-			}
-
-			POINT pt = { (LONG)Cursor->x, (LONG)Cursor->y };
-			ClientToScreen(Cursor->hwnd, &pt);
-
-			SetForegroundWindow(Cursor->hwnd);
-			int cmd = TrackPopupMenu(
-				hMenu,
-				TPM_RIGHTBUTTON | TPM_RETURNCMD,
-				pt.x, pt.y,
-				0, Cursor->hwnd, NULL
-			);
-			DestroyMenu(hMenu);
-
-			switch (cmd) {
-			case 101:
-				Locus[SelectLocus].Locus[Locus[SelectLocus].Mode].Turn = !Locus[SelectLocus].Locus[Locus[SelectLocus].Mode].Turn;
-				Return = true;
-				break;
-			case 102:
-			{
-				std::reverse(Locus.begin(), Locus.end());
-				SelectLocus = (int)Locus.size() - 1 - SelectLocus;
-				for (int i = 0; i < Locus.size(); i++) {
-					POS NewS = { 1.0f - Locus[i].Locus[Locus[i].Mode].F.x, 1.0f - Locus[i].Locus[Locus[i].Mode].F.y };
-					POS NewF = { 1.0f - Locus[i].Locus[Locus[i].Mode].S.x, 1.0f - Locus[i].Locus[Locus[i].Mode].S.y };
-					Locus[i].Locus[Locus[i].Mode].S = NewS;
-					Locus[i].Locus[Locus[i].Mode].F = NewF;
-					if (Locus[i].Tipe == 1) {
-						Locus[i].Tipe = 3;
-					}
-					else if (Locus[i].Tipe == 3) {
-						Locus[i].Tipe = 1;
-					}
-					Locus[i].Locus[Locus[i].Mode].Turn = !Locus[i].Locus[Locus[i].Mode].Turn;
-				}
-				Return = true;
-				break;
-			}
-			case 103:
-			{
-				UseCopy = true;
-				CopyLocus = Locus[SelectLocus].Locus[Locus[SelectLocus].Mode];
-				break;
-			}
-			case 104:
-			{
-				if (UseCopy) {
-					Locus[SelectLocus].Locus[CopyLocus.Mode].H1 = CopyLocus.H1;
-					Locus[SelectLocus].Locus[CopyLocus.Mode].H2 = CopyLocus.H2;
-					Locus[SelectLocus].Locus[CopyLocus.Mode].Turn = CopyLocus.Turn;
-					Locus[SelectLocus].Mode = CopyLocus.Mode;
-					Locus[SelectLocus].UseMode3 = (CopyLocus.Mode == 3) ? true : false;
-					Return = true;
-				}
-				break;
-			}
-			case 105:
-			{
-				int inputNum = 0;
-				if (EasingWindow(Cursor->hwnd, L"イージング番号入力", inputNum, *Cursor)) {
-					Locus[SelectLocus].Mode = 3;
-					Locus[SelectLocus].Locus[3].Turn = false;
-					Locus[SelectLocus].Locus[Locus[SelectLocus].Mode].H1.y = static_cast<float>(inputNum);
-					Locus[SelectLocus].UseMode3 = true;
-					Return = true;
-				}
-				break;
-			}
-			case 106:
-			{
-				if (Locus.size() != 1) {
-					if (SelectLocus == Locus.size() - 1) {
-						Locus[SelectLocus - 1].Locus[0].F = Locus[SelectLocus].Locus[0].F;
-						Locus[SelectLocus - 1].Locus[1].F = Locus[SelectLocus].Locus[1].F;
-						Locus[SelectLocus - 1].Locus[2].F = Locus[SelectLocus].Locus[2].F;
-						Locus[SelectLocus - 1].Locus[3].F = Locus[SelectLocus].Locus[3].F;
-						if (Locus.size() == 2) {
-							Locus[SelectLocus - 1].Tipe = 0;
-						}
-						else {
-							Locus[SelectLocus - 1].Tipe = 3;
-						}
-						Locus.erase(Locus.begin() + SelectLocus);
-						SelectLocus -= 1;
-						Locus[SelectLocus].Selected = true;
-					}
-					else {
-						Locus[SelectLocus + 1].Locus[0].S = Locus[SelectLocus].Locus[0].S;
-						Locus[SelectLocus + 1].Locus[1].S = Locus[SelectLocus].Locus[1].S;
-						Locus[SelectLocus + 1].Locus[2].S = Locus[SelectLocus].Locus[2].S;
-						Locus[SelectLocus + 1].Locus[3].S = Locus[SelectLocus].Locus[3].S;
-						if (SelectLocus == 0) {
-							Locus[SelectLocus + 1].Tipe = 1;
-						}
-						if (Locus.size() == 2) {
-							Locus[SelectLocus + 1].Tipe = 0;
-						}
-						Locus.erase(Locus.begin() + SelectLocus);
-						Locus[SelectLocus].Selected = true;
-					}
-					Return = true;
-				}
-				else {
-					MessageBeep(MB_ICONINFORMATION);
-				}
-				break;
-			}
-			}
-			Cursor->x = 0.0f;
-			Cursor->y = 0.0f;
-		}
-	}
-
 	bool UpdateSize = LocusUpdate;
 	D2D1_RECT_F Rect = Cursor->range.Range[L"Locus"];
 	D2D1_RECT_F Lrect = D2D1::RectF(Rect.left + 30.0f, Rect.top + 30.0f + 40.0f, Rect.right - 30.0f, Rect.bottom - 30.0f - 40.0f);
@@ -648,21 +513,21 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 					newLocus1.UpdateLocus = true;
 					newLocus2.UpdateLocus = true;
 
-					if (Locus[i].Tipe == 0) {
-						newLocus1.Tipe = 1;
-						newLocus2.Tipe = 3;
+					if (Locus[i].Type == 0) {
+						newLocus1.Type = 1;
+						newLocus2.Type = 3;
 					}
-					else if (Locus[i].Tipe == 1) {
-						newLocus1.Tipe = 1;
-						newLocus2.Tipe = 2;
+					else if (Locus[i].Type == 1) {
+						newLocus1.Type = 1;
+						newLocus2.Type = 2;
 					}
-					else if (Locus[i].Tipe == 2) {
-						newLocus1.Tipe = 2;
-						newLocus2.Tipe = 2;
+					else if (Locus[i].Type == 2) {
+						newLocus1.Type = 2;
+						newLocus2.Type = 2;
 					}
-					else if (Locus[i].Tipe == 3) {
-						newLocus1.Tipe = 2;
-						newLocus2.Tipe = 3;
+					else if (Locus[i].Type == 3) {
+						newLocus1.Type = 2;
+						newLocus2.Type = 3;
 					}
 					Return = true;
 					break;
@@ -710,6 +575,142 @@ bool EDITOR::Update(CUR* Cursor, bool LocusUpdate) {
 		else if (Locus[i - 1].LocusUI[Locus[i].Mode].F.Clicking) {
 			Locus[i].Locus[Locus[i].Mode].S.x = Locus[i - 1].Locus[Locus[i].Mode].F.x;
 			Locus[i].Locus[Locus[i].Mode].S.y = Locus[i - 1].Locus[Locus[i].Mode].F.y;
+		}
+	}
+
+	if (Cursor->rclick && Cursor->RangeCheck(L"LocusEditor") && NoHover) {
+		Cursor->rclick = false;
+		HMENU hMenu = CreatePopupMenu();
+		if (hMenu) {
+			AppendMenuW(hMenu, MF_STRING, 101, L"反転");
+			AppendMenuW(hMenu, MF_STRING, 102, L"全て反転");
+			AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+			AppendMenuW(hMenu, MF_STRING, 103, L"コピー");
+			if (UseCopy) {
+				AppendMenuW(hMenu, MF_STRING, 104, L"貼り付け");
+			}
+			else {
+				AppendMenuW(hMenu, MF_STRING | MF_GRAYED, 104, L"貼り付け");
+			}
+			AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+			AppendMenuW(hMenu, MF_STRING, 105, L"イージングを選択");
+			AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+			if (Locus.size() == 1) {
+				AppendMenuW(hMenu, MF_STRING | MF_GRAYED, 106, L"削除");
+			}
+			else {
+				AppendMenuW(hMenu, MF_STRING, 106, L"削除");
+			}
+
+			POINT pt = { (LONG)Cursor->x, (LONG)Cursor->y };
+			ClientToScreen(Cursor->hwnd, &pt);
+
+			SetForegroundWindow(Cursor->hwnd);
+			int cmd = TrackPopupMenu(
+				hMenu,
+				TPM_RIGHTBUTTON | TPM_RETURNCMD,
+				pt.x, pt.y,
+				0, Cursor->hwnd, NULL
+			);
+			DestroyMenu(hMenu);
+
+			switch (cmd) {
+			case 101:
+				Locus[SelectLocus].Locus[Locus[SelectLocus].Mode].Turn = !Locus[SelectLocus].Locus[Locus[SelectLocus].Mode].Turn;
+				Return = true;
+				break;
+			case 102:
+			{
+				std::reverse(Locus.begin(), Locus.end());
+				SelectLocus = (int)Locus.size() - 1 - SelectLocus;
+				for (int i = 0; i < Locus.size(); i++) {
+					POS NewS = { 1.0f - Locus[i].Locus[Locus[i].Mode].F.x, 1.0f - Locus[i].Locus[Locus[i].Mode].F.y };
+					POS NewF = { 1.0f - Locus[i].Locus[Locus[i].Mode].S.x, 1.0f - Locus[i].Locus[Locus[i].Mode].S.y };
+					Locus[i].Locus[Locus[i].Mode].S = NewS;
+					Locus[i].Locus[Locus[i].Mode].F = NewF;
+					if (Locus[i].Type == 1) {
+						Locus[i].Type = 3;
+					}
+					else if (Locus[i].Type == 3) {
+						Locus[i].Type = 1;
+					}
+					Locus[i].Locus[Locus[i].Mode].Turn = !Locus[i].Locus[Locus[i].Mode].Turn;
+				}
+				Return = true;
+				break;
+			}
+			case 103:
+			{
+				UseCopy = true;
+				CopyLocus = Locus[SelectLocus].Locus[Locus[SelectLocus].Mode];
+				break;
+			}
+			case 104:
+			{
+				if (UseCopy) {
+					Locus[SelectLocus].Locus[CopyLocus.Mode].H1 = CopyLocus.H1;
+					Locus[SelectLocus].Locus[CopyLocus.Mode].H2 = CopyLocus.H2;
+					Locus[SelectLocus].Locus[CopyLocus.Mode].Turn = CopyLocus.Turn;
+					Locus[SelectLocus].Mode = CopyLocus.Mode;
+					Locus[SelectLocus].UseMode3 = (CopyLocus.Mode == 3) ? true : false;
+					Return = true;
+				}
+				break;
+			}
+			case 105:
+			{
+				int inputNum = 0;
+				if (EasingWindow(Cursor->hwnd, L"イージング番号入力", inputNum, *Cursor)) {
+					Locus[SelectLocus].Mode = 3;
+					Locus[SelectLocus].Locus[3].Turn = false;
+					Locus[SelectLocus].Locus[Locus[SelectLocus].Mode].H1.y = static_cast<float>(inputNum);
+					Locus[SelectLocus].UseMode3 = true;
+					Return = true;
+				}
+				break;
+			}
+			case 106:
+			{
+				if (Locus.size() != 1) {
+					if (SelectLocus == Locus.size() - 1) {
+						Locus[SelectLocus - 1].Locus[0].F = Locus[SelectLocus].Locus[0].F;
+						Locus[SelectLocus - 1].Locus[1].F = Locus[SelectLocus].Locus[1].F;
+						Locus[SelectLocus - 1].Locus[2].F = Locus[SelectLocus].Locus[2].F;
+						Locus[SelectLocus - 1].Locus[3].F = Locus[SelectLocus].Locus[3].F;
+						if (Locus.size() == 2) {
+							Locus[SelectLocus - 1].Type = 0;
+						}
+						else {
+							Locus[SelectLocus - 1].Type = 3;
+						}
+						Locus.erase(Locus.begin() + SelectLocus);
+						SelectLocus -= 1;
+						Locus[SelectLocus].Selected = true;
+					}
+					else {
+						Locus[SelectLocus + 1].Locus[0].S = Locus[SelectLocus].Locus[0].S;
+						Locus[SelectLocus + 1].Locus[1].S = Locus[SelectLocus].Locus[1].S;
+						Locus[SelectLocus + 1].Locus[2].S = Locus[SelectLocus].Locus[2].S;
+						Locus[SelectLocus + 1].Locus[3].S = Locus[SelectLocus].Locus[3].S;
+						if (SelectLocus == 0) {
+							Locus[SelectLocus + 1].Type = 1;
+						}
+						if (Locus.size() == 2) {
+							Locus[SelectLocus + 1].Type = 0;
+						}
+						Locus.erase(Locus.begin() + SelectLocus);
+						Locus[SelectLocus].Selected = true;
+					}
+					Return = true;
+				}
+				else {
+					MessageBeep(MB_ICONINFORMATION);
+				}
+				break;
+			}
+			}
+			Cursor->x = 0.0f;
+			Cursor->y = 0.0f;
 		}
 	}
 

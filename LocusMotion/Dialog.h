@@ -8,3 +8,5 @@ void Draw_Svg_Dialog(ID2D1RenderTarget* pTarget, int resourceId, D2D1_RECT_F rec
 bool EasingWindow(HWND hParent, const wchar_t* title, int& outValue, CUR Cursor);
 
 bool ModifierWindow(HWND hParent, const wchar_t* title, CUR Cursor, LOCUSES& targetLocuses);
+
+bool ValueInputWindow(HWND hParent, const wchar_t* title, CUR Cursor, LOCUS& Locus, int Type);

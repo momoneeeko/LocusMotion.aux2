@@ -23,7 +23,7 @@ HCURSOR hDragCursor = NULL;
 //---------------------------------------------------------------------
 COMMON_PLUGIN_TABLE common_plugin_table = {
 	L"LocusMotion",								// プラグインの名前
-	L"LocusMotion β5.1.3 もも猫(@momo_neeeko)",		// プラグインの情報
+	L"LocusMotion β6.0 もも猫(@momo_neeeko)",		// プラグインの情報
 };
 
 //---------------------------------------------------------------------
@@ -104,7 +104,7 @@ void UpdateCursorShape(HWND hwnd, const CUR& cursor, const EDITOR& Editor, const
 			SetCursor(LoadCursor(NULL, IDC_SIZEALL)); //視点移動
 		}
 		else if (Effects.RatioHover || Effects.RatioClicking) {
-			SetCursor(LoadCursor(NULL, (cursor.range.Type == 0) ? IDC_SIZENS : IDC_SIZEWE)); //エフェクト一覧割合
+			SetCursor(LoadCursor(NULL, (cursor.range.Type%2 == 0) ? IDC_SIZENS : IDC_SIZEWE)); //エフェクト一覧割合
 		}
 		else if ((Editor.ReturnSizeHover && !Editor.ReturnSizeHide) || Editor.TurnHover || Editor.ModeMenuHover || Editor.ModeMenuClicking || (!Editor.NoHover) || Editor.PlayHover) {
 			SetCursor(LoadCursor(NULL, IDC_HAND)); //エディタUIホバー
@@ -131,7 +131,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		}
 
 		EDIT_LOCUSES defaultLocus;
-		defaultLocus.Tipe = 0;
+		defaultLocus.Type = 0;
 		defaultLocus.Locus[0].Mode = 0;
 		defaultLocus.Locus[1].Mode = 1;
 		defaultLocus.Locus[2].Mode = 2;
@@ -185,7 +185,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 
 		cursor.action = true;
 		cursor.hwnd = hwnd;
-		break;
+		return 0;
 	}
 	case WM_SIZE: {
 		WinWidth = LOWORD(lparam);
@@ -242,21 +242,21 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		cursor.moveing = false;
 		cursor.drop = false;
 		cursor.wheel = 0.0f;
-		break;
+		return 0;
 	}
 	case WM_MOUSEMOVE: {
 		cursor.x = (float)(short)LOWORD(lparam);
 		cursor.y = (float)(short)HIWORD(lparam);
 		cursor.moveing = true;
 		cursor.action = true;
-		break;
+		return 0;
 	}
 	case WM_LBUTTONDOWN: {
 		cursor.click = true;
 		cursor.clicking = true;
 		cursor.action = true;
 		SetCapture(hwnd);
-		break;
+		return 0;
 	}
 	case WM_LBUTTONUP: {
 		cursor.clicking = false;
@@ -268,7 +268,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		if (GetCapture() == hwnd) {
 			ReleaseCapture();
 		}
-		break;
+		return 0;
 	}
 	case WM_LBUTTONDBLCLK: {
 		cursor.dclick = true;
@@ -276,14 +276,14 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		cursor.clicking = true;
 		cursor.action = true;
 		SetCapture(hwnd);
-		break;
+		return 0;
 	}
 	case WM_MBUTTONDOWN: {
 		cursor.mclick = true;
 		cursor.mclicking = true;
 		cursor.action = true;
 		SetCapture(hwnd);
-		break;
+		return 0;
 	}
 	case WM_MBUTTONUP: {
 		cursor.mclicking = false;
@@ -291,14 +291,14 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		if (GetCapture() == hwnd) {
 			ReleaseCapture();
 		}
-		break;
+		return 0;
 	}
 	case WM_RBUTTONDOWN: {
 		cursor.rclick = true;
 		cursor.rclicking = true;
 		cursor.action = true;
 		SetCapture(hwnd);
-		break;
+		return 0;
 	}
 	case WM_RBUTTONUP: {
 		cursor.rclicking = false;
@@ -306,20 +306,20 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		if (GetCapture() == hwnd) {
 			ReleaseCapture();
 		}
-		break;
+		return 0;
 	}
 	case WM_MOUSEWHEEL: {
 		cursor.action = true;
 		short delta = GET_WHEEL_DELTA_WPARAM(wparam);
 		cursor.wheel = (std::min)((std::max)(cursor.wheel + (float)(delta / 120), -1.5f), 1.5f);
-		break;
+		return 0;
 	}
 	case WM_SETCURSOR: {
 		if (LOWORD(lparam) == HTCLIENT) {
 			UpdateCursorShape(hwnd, cursor, Editor, Effects);
 			return TRUE;
 		}
-		break;
+		return 0;
 	}
 	case WM_GETMINMAXINFO: {
 		LPMINMAXINFO mmi = (LPMINMAXINFO)lparam;
@@ -365,7 +365,7 @@ SCRIPT_MODULE_FUNCTION functions[] = {
 };
 
 SCRIPT_MODULE_TABLE script_module_table = {
-	L"LocusMotion β5.1.3 もも猫(@momo_neeeko)",
+	L"LocusMotion β6.0 もも猫(@momo_neeeko)",
 	functions
 };
 
@@ -568,7 +568,6 @@ void ProcApplyEditorLocusItemMenu(EDIT_SECTION* edit, OBJECT_HANDLE object, LPCW
 		bool is_number = true;
 		try {
 			size_t idx = 0;
-			std::stod(token, &idx);
 			if (idx != token.size()) {
 				is_number = false;
 			}
@@ -634,13 +633,18 @@ EXTERN_C __declspec(dllexport) void RegisterPlugin(HOST_APP_TABLE* host) {
 	float Ratio = wcstod(buffer, nullptr);
 	GetPrivateProfileStringW(L"EffectWindow", L"RatioLock", L"0", buffer, 256, path);
 	int RatioLock = _wtoi(buffer);
+	GetPrivateProfileStringW(L"EffectWindow", L"PosType", L"0", buffer, 256, path);
+	int PosType = _wtoi(buffer);
 	Effects.Hide = Hide;
+	Effects.HideNumF = Hide;
 	Effects.HideAnime = Hide;
 	Effects.DisplayRatio = Ratio;
 	Effects.RatioLock = RatioLock;
+	cursor.range.PosType = PosType;
 	WritePrivateProfileStringW(L"EffectWindow", L"Hide", std::to_wstring(Effects.Hide).c_str(), path);
 	WritePrivateProfileStringW(L"EffectWindow", L"Ratio", std::to_wstring(Effects.DisplayRatio).c_str(), path);
 	WritePrivateProfileStringW(L"EffectWindow", L"RatioLock", std::to_wstring(Effects.RatioLock).c_str(), path);
+	WritePrivateProfileStringW(L"EffectWindow", L"PosType", std::to_wstring(cursor.range.PosType).c_str(), path);
 
 
 	hDragCursor = LoadCursor(hModule, MAKEINTRESOURCE(ID_CURSOR_DRAG));

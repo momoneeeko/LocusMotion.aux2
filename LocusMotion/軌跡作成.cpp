@@ -254,73 +254,144 @@ double LOCUSES::LocusesToValue(double Time, int n) {
 double LOCUSES::PlayModifier(double x, double Time, double framerate, int n) {
     double t = x;
     double out = 0.0;
-    double Trans = 0.1;
 
-    //前半モディファイア
-    for (int i = 0; i < Modifier.size(); i++) {
-        switch (Modifier[i].Mode) {
-        case 1: {   //コマ落ち
-            double v = Modifier[i].ChengeUnit((int)Modifier[i].Param[1], 0, Modifier[i].Param[0]); //間隔
-            double p = Modifier[i].ChengeUnit((int)Modifier[i].Param[3], 0, Modifier[i].Param[2]); //開始位置
-            t = (floor((t * Time - p) / v) * v + p) / Time;
-            break;
-        }
-        }
-    }
+    // 各モディファイアのステップ数（段々ループ用）を保持
+    std::vector<double> stepValues(Modifier.size(), 0.0);
 
-    //中間モディファイア
-    for (int i = 0; i < Modifier.size(); i++) {
+    // ==========================================
+    // 1. 時間軸のモディファイアを上から順に適用
+    // ==========================================
+    for (size_t i = 0; i < Modifier.size(); i++) {
         switch (Modifier[i].Mode) {
-        case 4: {
-            if (t != 1.0) {
-                t = fmod(x * Modifier[i].Param[0], 1.0);
+        case 1: {   // コマ落ち
+            double v = Modifier[i].ChengeUnit((int)Modifier[i].Param[1], 0, Modifier[i].Param[0]);
+            double p = Modifier[i].ChengeUnit((int)Modifier[i].Param[3], 0, Modifier[i].Param[2]);
+            if (Time > 0.0) {
+                t = (floor((t * Time - p) / v) * v + p) / Time;
             }
             break;
         }
-        case 5: {
-            t = fmod(t * Modifier[i].Param[0], 1.0);
-            t = (t <= 0.5) ? t * 2.0 : 1.0 - (t - 0.5) * 2.0;
+        case 4: {   // ループ
+            double loops = Modifier[i].Param[0];
+            if (loops > 0.0) {
+                t = fmod(t * loops, 1.0);
+            }
             break;
         }
-        case 6: {
-            t = fmod(t * Modifier[i].Param[0], 1.0);
+        case 5: {   // ミラーループ
+            double loops = Modifier[i].Param[0];
+            if (loops > 0.0) {
+                t = fmod(t * loops, 1.0);
+                t = (t <= 0.5) ? t * 2.0 : 1.0 - (t - 0.5) * 2.0;
+            }
+            break;
+        }
+        case 6: {   // 段々ループ（時間側）
+            double loops = Modifier[i].Param[0];
+            if (loops > 0.0) {
+                // ミラーループ等で往復している t の動きを考慮してステップと時間を分離
+                double scaled = t * loops;
+                stepValues[i] = floor(scaled);
+                t = fmod(scaled, 1.0);
+                // もし前のモディファイアで逆行している区間があれば、波形が自然に繋がるように調整
+                if (t < 0.0) t = -t;
+            }
             break;
         }
         }
     }
 
-    // Timeから数値を計算
+    // 範囲の安全確保 (0.0 〜 1.0)
+    t = (std::max)(0.0, (std::min)(1.0, t));
+
+    // ==========================================
+    // 2. 確定した時間 t からベース曲線の値を計算
+    // ==========================================
     out = LocusesToValue(t, n);
 
-    //後半モディファイア
-    for (int i = 0; i < Modifier.size(); i++) {
+    // ==========================================
+    // 3. 値軸のモディファイアを上から順に適用
+    // ==========================================
+    for (size_t i = 0; i < Modifier.size(); i++) {
         switch (Modifier[i].Mode) {
-        case 2: {   //離散化
-            if (Modifier[i].Param[1] == 0.0) {
-                out = floor(out * Modifier[i].Param[0]) / Modifier[i].Param[0];
-            }
-            else if (Modifier[i].Param[1] == 1.0) {
-                out = round(out * Modifier[i].Param[0]) / Modifier[i].Param[0];
-            }
-            else {
-                out = ceil(out * Modifier[i].Param[0]) / Modifier[i].Param[0];
-            }
-            break;
-        }
-        case 3: {   //速度化
-            if (t - Modifier[i].Param[0] / 100.0 / 2.0 <= 0.0) {
-                out = (LocusesToValue(t + Modifier[i].Param[0] / 100.0 / 2.0, n) - LocusesToValue(t, n)) / (Modifier[i].Param[0] / 100.0 / 2.0);
-            }
-            else if (t + Modifier[i].Param[0] / 100 / 2.0 >= 1.0) {
-                out = (LocusesToValue(t, n) - LocusesToValue(t - Modifier[i].Param[0] / 100.0 / 2.0, n)) / (Modifier[i].Param[0] / 100.0 / 2.0);
-            }
-            else {
-                out = (LocusesToValue(t + Modifier[i].Param[0] / 100.0 / 2.0, n) - LocusesToValue(t - Modifier[i].Param[0] / 100.0 / 2.0, n)) / (Modifier[i].Param[0] / 100.0);
+        case 2: {   // 離散化
+            double count = Modifier[i].Param[0];
+            if (count > 0.0) {
+                if (Modifier[i].Param[1] == 0.0) {
+                    out = floor(out * count) / count;
+                }
+                else if (Modifier[i].Param[1] == 1.0) {
+                    out = round(out * count) / count;
+                }
+                else {
+                    out = ceil(out * count) / count;
+                }
             }
             break;
         }
-        case 6: {
-            out = (out + floor(x * Modifier[i].Param[0])) / Modifier[i].Param[0];
+        case 3: {   // 速度化
+            double inc = Modifier[i].Param[0] / 100.0;
+            if (inc > 0.0) {
+                if (t - inc / 2.0 <= 0.0) {
+                    out = (LocusesToValue(t + inc / 2.0, n) - LocusesToValue(t, n)) / (inc / 2.0);
+                }
+                else if (t + inc / 2.0 >= 1.0) {
+                    out = (LocusesToValue(t, n) - LocusesToValue(t - inc / 2.0, n)) / (inc / 2.0);
+                }
+                else {
+                    out = (LocusesToValue(t + inc / 2.0, n) - LocusesToValue(t - inc / 2.0, n)) / inc;
+                }
+            }
+            break;
+        }
+        case 6: {   // 段々ループ（値側）
+            double loops = Modifier[i].Param[0];
+            if (loops > 0.0) {
+                double step = stepValues[i];
+                out = (out + step) / loops;
+            }
+            break;
+        }
+        case 7: {   // 波形合成
+            float rad = ((int)Modifier[i].Param[4] == 0) ? (float)(Modifier[i].Param[3] / 180.0 * PI) : (float)Modifier[i].Param[3];
+            float f = ((int)Modifier[i].Param[1] == 0) ? (float)(1.0 / Modifier[i].Param[0]) : (float)Modifier[i].Param[0];
+            float dir = (float)(x * 2.0 * PI * f) + rad;
+            double amp = Modifier[i].Param[2] / 100.0;
+            int waveType = (int)Modifier[i].Param[5];
+
+            if (waveType == 0) {
+                out = out + sin(dir) * amp;
+            }
+            else if (waveType == 1) {
+                out = out + (1.0 - abs((dir * 0.159155f + 0.25f) - floor(dir * 0.159155f + 0.25f) - 0.5f) * 4.0) * amp;
+            }
+            else if (waveType == 2) {
+                out = out + (((dir * 0.159155f) - floor(dir * 0.159155f)) < 0.5 ? 1.0 : -1.0) * amp;
+            }
+            else if (waveType == 3) {
+                out = out + (1.0 - abs((((dir) * 0.159155f + 0.5) - floor((dir) * 0.159155f + 0.5)) - 1) * 2.0) * amp;
+            }
+            else {
+                out = out + abs(sin(dir)) * amp;
+            }
+            break;
+        }
+        case 8: {   // 積分
+            int divisions = Modifier[i].Param[0] * t;
+            if (t > 0.0001 && divisions > 0) {
+                double dt = t / divisions;
+                double sum = 0.0;
+                double prev_val = LocusesToValue(0.0, n);
+                for (int k = 1; k <= divisions; k++) {
+                    double cur_val = LocusesToValue(k * dt, n);
+                    sum += (prev_val + cur_val) * 0.5 * dt;
+                    prev_val = cur_val;
+                }
+                out = sum;
+            }
+            else {
+                out = 0.0;
+            }
             break;
         }
         }
@@ -487,7 +558,7 @@ LOCUSES EDITOR::ToLocuses() {
 void EDITOR::SetLocuses(LOCUSES Locuses) {
     Locus.clear();
     EDIT_LOCUSES defaultLocus;
-    defaultLocus.Tipe = 0;
+    defaultLocus.Type = 0;
     defaultLocus.Locus[0].Mode = 0;
     defaultLocus.Locus[1].Mode = 1;
     defaultLocus.Locus[2].Mode = 2;
@@ -537,17 +608,17 @@ void EDITOR::SetLocuses(LOCUSES Locuses) {
         EDIT_LOCUSES newLocus = defaultLocus;
         newLocus.Locus[Locuses.Locus[i].Mode] = Locuses.Locus[i];
         if (Locuses.Locus.size() == 1) {
-            newLocus.Tipe = 0;
+            newLocus.Type = 0;
         }
         else {
             if (i == 0) {
-                newLocus.Tipe = 1;
+                newLocus.Type = 1;
             }
             else if (i == Locuses.Locus.size() - 1) {
-                newLocus.Tipe = 3;
+                newLocus.Type = 3;
             }
             else {
-                newLocus.Tipe = 2;
+                newLocus.Type = 2;
             }
         }
         newLocus.Mode = Locuses.Locus[i].Mode;

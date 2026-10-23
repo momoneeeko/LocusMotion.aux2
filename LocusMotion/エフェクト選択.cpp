@@ -106,7 +106,7 @@ bool P_Effect::Locus_Update(D2D1_RECT_F Rect, CUR *Cursor) const {
 			Return = true;
 		}
 
-		if (Cursor->rclick && LocusHover[i]) {
+		if (Cursor->rclick && LocusHover[i] && !cursor.drag) {
 			Cursor->rclick = false;
 			HMENU hMenu = CreatePopupMenu();
 			if (hMenu) {
@@ -291,11 +291,106 @@ void P_Effect::SetTrackbar(int LocusID) const {
 	}
 }
 
+void P_Effects::SetTrackbars(int LocusID, std::vector<P_Effect>* Item) {
+	std::vector<std::wstring> Names;
+	std::vector<std::string> StrValues;
+	for (int i = 0; i < (*Item).size(); i++) {
+		(*Item)[i].LocusHover.assign((*Item)[i].SectionNum, false);
+		(*Item)[i].LocusHoverAnime.assign((*Item)[i].SectionNum, 0.0f);
+		Names.push_back((*Item)[i].Name);
+		StrValues.push_back((*Item)[i].StrValue.empty() ? "0.00" : (*Item)[i].StrValue);
+	}
+
+	OBJECT_HANDLE target_obj = (*Item)[0].ObjectHandle;
+	EFFECT_HANDLE target_effect = (*Item)[0].EffectHandle;
+
+	if (edit_handle && target_obj && target_effect) {
+		struct WriteParam {
+			OBJECT_HANDLE obj;
+			EFFECT_HANDLE effect;
+			int SectionNum;
+			int LocusID;
+			std::vector<std::wstring> item_name;
+			std::vector<std::string> value;
+		};
+
+		WriteParam* p_param = new WriteParam{
+			target_obj,
+			target_effect,
+			(*Item)[0].SectionNum,
+			LocusID,
+			Names,
+			StrValues
+		};
+
+		edit_handle->call_edit_section_param(p_param, [](void* param_ptr, EDIT_SECTION* edit) {
+			if (!param_ptr) return;
+
+			WriteParam* p_write = static_cast<WriteParam*>(param_ptr);
+
+			if (edit && p_write->obj && p_write->effect) {
+				LPCWSTR eff_name = edit->get_effect_name(p_write->effect);
+				if (eff_name) {
+					for (int j = 0; j < p_write->item_name.size(); j++) {
+						int target_index = -1;
+						int count = 0;
+
+						int total_effects = edit->get_effect_list(p_write->obj, nullptr, 0);
+						if (total_effects > 0) {
+							std::vector<EFFECT_HANDLE> effect_list(total_effects);
+							edit->get_effect_list(p_write->obj, effect_list.data(), total_effects);
+
+							for (int i = 0; i < total_effects; ++i) {
+								LPCWSTR cur_name = edit->get_effect_name(effect_list[i]);
+								if (cur_name && std::wcscmp(cur_name, eff_name) == 0) {
+									if (effect_list[i] == p_write->effect) {
+										target_index = count;
+										break;
+									}
+									count++;
+								}
+							}
+						}
+						std::wstring spec_effect_name = eff_name;
+						if (target_index > 0) {
+							spec_effect_name += L":" + std::to_wstring(target_index);
+						}
+
+						std::string val = p_write->value[j];
+						size_t comma_pos = val.find(',');
+						if (comma_pos != std::string::npos) {
+							val = val.substr(0, comma_pos);
+						}
+
+						std::string add = "";
+						int tempnum = p_write->SectionNum;
+						for (int i = 0; i < tempnum; i++) {
+							add = add + "," + val;
+						}
+
+						std::string new_val = p_write->value[j] + add + ",LocusMotion,0|" + std::to_string(p_write->LocusID);
+
+						edit->set_object_item_value(
+							p_write->obj,
+							spec_effect_name.c_str(),
+							p_write->item_name[j].c_str(),
+							new_val.c_str()
+						);
+					}
+				}
+			}
+
+			delete p_write;
+			});
+	}
+}
+
 void P_Effect::DeleteTrackbar() const {
 	OBJECT_HANDLE target_obj = ObjectHandle;
 	EFFECT_HANDLE target_effect = EffectHandle;
 
 	if (edit_handle && target_obj && target_effect) {
+		LocusID = -1;
 		struct WriteParam {
 			OBJECT_HANDLE obj;
 			EFFECT_HANDLE effect;
@@ -455,31 +550,38 @@ void P_Effect::ChangeIDTrackbar(int NewLocusID) const {
 	}
 }
 
-bool P_Effect::Update(D2D1_RECT_F Rect, CUR *Cursor) const {
+bool P_Effect::Update(D2D1_RECT_F Rect, CUR* Cursor, int* Group) const {
 	bool Return = false;
 	Hover = Cursor->RectCheck(Rect) && Cursor->RangeCheck(L"EffectsList");
+	if (Hover && Cursor->drag) {
+			Focus = true;
+			*Group = 1;
+	}
 
 	if (Cursor->drop && Hover && Tipe == L"項目" && !UseElse) {
 		if (Use) {
 			LocusData.SetAllLocuses(LocusID, Editor.ToLocuses());
 		}
 		else {
-			int ID = LocusData.NewSetLocuses(SectionNum, Editor.ToLocuses());
-			SetTrackbar(ID);
-			Use = true;
-			LocusID = ID;
+			if (!(Cursor->drop && !(GetAsyncKeyState(VK_SHIFT) & 0x8000)) || GroupItems.size() == 0) {
+				int ID = LocusData.NewSetLocuses(SectionNum, Editor.ToLocuses());
+				SetTrackbar(ID);
+				Use = true;
+				LocusID = ID;
+			}
+			*Group = 2;
 		}
 		Return = true;
 	}
 
 	if (Cursor->RangeCheck(L"EffectsList")) {
-		if (Hover && (Cursor->click)) {
+		if (Hover && (Cursor->click || (Cursor->rclick && cursor.drag))) {
 			if (Tipe == L"エフェクト" || Use) {
 				Cursor->click = false;
 				Open = (Open + 1) % 2;
 			}
 		}
-		if (Hover && (Cursor->click || Cursor->rclick)) {
+		if (Hover && (Cursor->click || (Cursor->rclick && !cursor.drag))) {
 			if (Tipe == L"項目" && !Use && !UseElse) {
 				Cursor->click = false;
 				Cursor->rclick = false;
@@ -543,7 +645,7 @@ bool P_Effect::Update(D2D1_RECT_F Rect, CUR *Cursor) const {
 			Return = true;
 		}
 
-		if (Hover && Cursor->rclick && Tipe == L"項目" && Use) {
+		if (Hover && Cursor->rclick && Tipe == L"項目" && Use && !cursor.drag) {
 			Cursor->click = false;
 			Cursor->rclick = false;
 			HMENU hMenu = CreatePopupMenu();
@@ -739,7 +841,7 @@ void P_Effect::Draw(D2D1_RECT_F Rect, CUR* Cursor) const {
 	g_pBrush->SetColor(D2D1::ColorF(r, g, b));
 	g_pRenderTarget->FillRoundedRectangle(roundedRect2, g_pBrush);
 	if (Cursor->drag && Tipe == L"項目") {
-		g_pBrush->SetColor(D2D1::ColorF(0x85deff, HoverAnime));
+		g_pBrush->SetColor(D2D1::ColorF(0x85deff, Focus));
 		g_pRenderTarget->DrawRoundedRectangle(roundedRect2, g_pBrush, 1.5f);
 	}
 	if (UseElse) {
@@ -855,6 +957,7 @@ void P_Effects::GetObjectEffects() {
 			effect_item.EffectHandle = effect_h;
 			effect_item.Open = false;
 			effect_item.Use = true;
+			effect_item.EffectNum = eff_i;
 
 			auto it_h = old_handle_map.find(effect_h);
 			if (it_h != old_handle_map.end()) {
@@ -895,6 +998,7 @@ void P_Effects::GetObjectEffects() {
 					child_item.Open = false;
 					child_item.Use = false;
 					child_item.UseElse = false;
+					child_item.EffectNum = p_enum->effect_index;
 					child_item.SectionNum = p_enum->edit->get_object_section_num(p_enum->obj_handle);
 					child_item.LocusHover.assign(child_item.SectionNum, false);
 					child_item.LocusHoverAnime.assign(child_item.SectionNum, 0.0f);
@@ -978,7 +1082,6 @@ void P_Effects::GetObjectEffects() {
 								if (track_info.param && track_info.param_num > 0) {
 									if (track_info.param[0] != -1) {
 										child_item.LocusID = static_cast<int>(track_info.param[0]);
-
 									}
 									else {
 										child_item.LocusID = LocusData.NewSetLocuses(child_item.SectionNum, Editor.ToLocuses());
@@ -989,6 +1092,35 @@ void P_Effects::GetObjectEffects() {
 							}
 							else {
 								child_item.UseElse = true;
+							}
+						}
+						if (track_info.group_num > 1 && track_info.group_name != nullptr) {
+							std::vector<LPCWSTR> ItemNames(track_info.group_num);
+							int retrieved = p_enum->edit->get_object_track_group_names(
+								p_enum->obj_handle,
+								p_enum->parent_name.c_str(),
+								track_info.group_name,
+								ItemNames.data(),
+								track_info.group_num
+							);
+
+							for (int k = 0; k < retrieved; k++) {
+								if (ItemNames[k]) {
+									child_item.GroupItems.push_back(ItemNames[k]);
+								}
+							}
+							if (child_item.Use && child_item.LocusID != -1) {
+								for (const auto& groupItemName : child_item.GroupItems) {
+									if (groupItemName != item_name) {
+										TRACK_INFO other_track = {};
+										if (p_enum->edit->get_effect_track_info(p_enum->parent_handle, groupItemName.c_str(), &other_track, sizeof(TRACK_INFO))) {
+											if (other_track.mode && std::wcscmp(other_track.mode, L"LocusMotion") == 0 &&
+												other_track.param && other_track.param_num > 0 && other_track.param[0] == -1) {
+												other_track.param[0] = child_item.LocusID;
+											}
+										}
+									}
+								}
 							}
 						}
 					}
@@ -1048,6 +1180,7 @@ bool P_Effects::Update(CUR *Cursor) {
 	YRange = 0.0;
 	bool EffectOpen = false;
 	for (const auto& e : Effect) {
+		e.Focus = false;
 		if (e.Tipe == L"エフェクト") {
 			YRange += 30.0;
 			if (e.Open) {
@@ -1063,7 +1196,7 @@ bool P_Effects::Update(CUR *Cursor) {
 				YRange += 100.0f;
 		}
 	}
-	YRange = (std::max)(YRange - (Rect.bottom - Rect.top), 0.0f);
+	YRange = (std::max)(YRange - (Rect.bottom - Rect.top) + 10.0f, 0.0f);
 
 	if (Cursor->RangeCheck(L"EffectsList")) {
 		if (Cursor->wheel > 0 && !(GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
@@ -1076,14 +1209,68 @@ bool P_Effects::Update(CUR *Cursor) {
 	HideButtonHover = Cursor->RectCheck(Cursor->range.Range[L"EffectsListHide"]);
 	RatioHover = Cursor->RectCheck(Cursor->range.Range[L"EffectsListRatio"]) && !Hide;
 
-	if (HideButtonHover && Cursor->click) {
-		Hide = !Hide;
+	if (DragHover && ((Cursor->RangeCheck(L"Locus") || Cursor->RangeCheck(L"EffectsListHide")) && !Cursor->drag)) {
+		Hide = true;
 		HideNumF += 1;
-		//ini関係
-		if (!g_iniPath.empty()) {
-			WritePrivateProfileStringW(L"EffectWindow", L"Hide", std::to_wstring(Hide).c_str(), g_iniPath.c_str());
-		}
+		DragHover = false;
 		Return = true;
+	}
+
+	if (HideButtonHover) {
+		if (Cursor->drag && Hide && !DragHover) {
+			Hide = false;
+			HideNumF += 1;
+			DragHover = true;
+			Return = true;
+		}
+		if (Cursor->click) {
+			Hide = !Hide;
+			HideNumF += 1;
+			//ini関係
+			if (!g_iniPath.empty()) {
+				WritePrivateProfileStringW(L"EffectWindow", L"Hide", std::to_wstring(Hide).c_str(), g_iniPath.c_str());
+			}
+			Return = true;
+		}
+		if (Cursor->rclick && !Cursor->drag) {
+			Cursor->click = false;
+			Cursor->rclick = false;
+			HMENU hMenu = CreatePopupMenu();
+			if (hMenu) {
+				if (Cursor->range.Type==0 || Cursor->range.Type == 2) {
+					AppendMenuW(hMenu, MF_STRING, 101, L"上下入れ替える");
+				}
+				else {
+					AppendMenuW(hMenu, MF_STRING, 101, L"左右入れ替える");
+				}
+
+				POINT pt = { (LONG)Cursor->x, (LONG)Cursor->y };
+				ClientToScreen(Cursor->hwnd, &pt);
+
+				SetForegroundWindow(Cursor->hwnd);
+				int cmd = TrackPopupMenu(
+					hMenu,
+					TPM_RIGHTBUTTON | TPM_RETURNCMD,
+					pt.x, pt.y,
+					0, Cursor->hwnd, NULL
+				);
+				DestroyMenu(hMenu);
+
+				switch (cmd) {
+				case 101:
+				{
+					Cursor->range.PosType = (int)!Cursor->range.PosType;
+					if (!g_iniPath.empty()) {
+						WritePrivateProfileStringW(L"EffectWindow", L"PosType", std::to_wstring(Cursor->range.PosType).c_str(), g_iniPath.c_str());
+					}
+					break;
+				}
+				}
+			}
+			Cursor->x = 0.0f;
+			Cursor->y = 0.0f;
+			Return = true;
+		}
 	}
 	if (RatioHover) {
 		if (Cursor->click && !RatioLock) {
@@ -1137,10 +1324,16 @@ bool P_Effects::Update(CUR *Cursor) {
 			}
 		}
 		if (Cursor->range.Type == 0) {
-			DisplayRatio -= Cursor->move.y / Cursor->range.Range[L"EffectsList"].bottom;
+			DisplayRatio -= Cursor->move.y / (Cursor->range.Height - 30.0f);
+		}
+		else if (Cursor->range.Type == 1) {
+			DisplayRatio -= Cursor->move.x / (Cursor->range.Width - 30.0f);
+		}
+		else if (Cursor->range.Type == 2) {
+			DisplayRatio += Cursor->move.y / (Cursor->range.Height - 30.0f);
 		}
 		else {
-			DisplayRatio -= Cursor->move.x / Cursor->range.Range[L"EffectsList"].right;
+			DisplayRatio += Cursor->move.x / (Cursor->range.Width - 30.0f);
 		}
 		DisplayRatio = (std::min)((std::max)(DisplayRatio, 0.15f), 0.85f);
 		Return = true;
@@ -1186,7 +1379,8 @@ bool P_Effects::Update(CUR *Cursor) {
 				item = false;
 			}
 			D2D1_RECT_F PEffectRect = D2D1::RectF(Rect.left + 1, Rect.top + y + 1, Rect.right - 10, Rect.top + y + 30 - 1);
-			if (e.Update(PEffectRect, Cursor)) {
+			int Focus = 0;
+			if (e.Update(PEffectRect, Cursor, &Focus)) {
 				Return = true;
 			}
 			open = e.Open;
@@ -1195,8 +1389,31 @@ bool P_Effects::Update(CUR *Cursor) {
 		else if ((e.Tipe == L"項目") && (open == true)) {
 			item = true;
 			D2D1_RECT_F PEffectRect = D2D1::RectF(Rect.left + 15 + 1, Rect.top + y + 1, Rect.right - 10, Rect.top + y + 30 - 1);
-			if (e.Update(PEffectRect, Cursor)) {
+			int Focus = 0;
+			if (e.Update(PEffectRect, Cursor, &Focus)) {
 				Return = true;
+			}
+			if (Focus==1 && e.GroupItems.size() != 0 && !(GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
+				for (int i = 0; i < Effect.size(); i++) {
+					if (Effect[i].Tipe == L"項目" && Effect[i].EffectHandle == e.EffectHandle && Effect[i].LocusID == e.LocusID) {
+						auto it = std::find(e.GroupItems.begin(), e.GroupItems.end(), Effect[i].Name);
+						if (it != e.GroupItems.end()) {
+							Effect[i].Focus = true;
+						}
+					}
+				}
+			}
+			if (Focus == 2 && e.GroupItems.size() != 0 && !(GetAsyncKeyState(VK_SHIFT) & 0x8000)) {
+				std::vector<P_Effect> UpdateItems;
+				for (int i = 0; i < Effect.size(); i++) {
+					if (Effect[i].Tipe == L"項目" && Effect[i].EffectHandle == e.EffectHandle && !Effect[i].Use) {
+						auto it = std::find(e.GroupItems.begin(), e.GroupItems.end(), Effect[i].Name);
+						if (it != e.GroupItems.end()) {
+							UpdateItems.push_back(Effect[i]);
+						}
+					}
+				}
+				SetTrackbars(LocusData.NewSetLocuses(e.SectionNum, Editor.ToLocuses()), &UpdateItems);
 			}
 			y += 30.0f + 100.0f * e.Use * e.Open;
 		}
@@ -1208,7 +1425,7 @@ bool P_Effects::Update(CUR *Cursor) {
 	return Return;
 }
 
-void P_Effects::Draw(CUR *Cursor) {
+void P_Effects::Draw(CUR* Cursor) {
 	D2D1_RECT_F Rect = Cursor->range.Range[L"EffectsList"];
 
 	g_pRenderTarget->PushAxisAlignedClip(
@@ -1217,8 +1434,6 @@ void P_Effects::Draw(CUR *Cursor) {
 	);
 	g_pBrush->SetColor(D2D1::ColorF(config->get_color_code(config, "Grouping")));
 	g_pRenderTarget->FillRectangle(Rect, g_pBrush);
-	g_pBrush->SetColor(D2D1::ColorF(config->get_color_code(config, "Border")));
-	g_pRenderTarget->FillRectangle(D2D1::RectF(Rect.left, Rect.top, Rect.right, Rect.top + 1.25f), g_pBrush);
 
 	float RectYRange = (Rect.bottom - Rect.top);
 	float ScrollRatio;
@@ -1246,26 +1461,35 @@ void P_Effects::Draw(CUR *Cursor) {
 				item = false;
 			}
 			D2D1_RECT_F PEffectRect = D2D1::RectF(Rect.left + 1, Rect.top + y + 1, Rect.right - 10, Rect.top + y + 30 - 1);
-				e.Draw(PEffectRect, Cursor);
+			e.Draw(PEffectRect, Cursor);
 			open = e.Open;
 			y += 30.0f;
 		}
 		else if ((e.Tipe == L"項目") && (open == true)) {
 			item = true;
 			D2D1_RECT_F PEffectRect = D2D1::RectF(Rect.left + 15 + 1, Rect.top + y + 1, Rect.right - 10, Rect.top + y + 30 - 1);
-				e.Draw(PEffectRect, Cursor);
+			e.Draw(PEffectRect, Cursor);
 			y += 30.0f + 100.0f * e.Use * e.Open;
 		}
 	}
 	g_pRenderTarget->PopAxisAlignedClip();
+
+	g_pBrush->SetColor(D2D1::ColorF(config->get_color_code(config, "Border")));
+	g_pRenderTarget->FillRectangle(D2D1::RectF(Rect.left, Rect.top, Rect.right, Rect.top + 1.25f), g_pBrush);
 
 	D2D1_RECT_F RatioRect = Cursor->range.Range[L"EffectsListRatio"];
 	g_pBrush->SetColor(D2D1::ColorF(config->get_color_code(config, "BorderFocus"), (std::max)(RatioHoverAnime, (float)RatioClicking)));
 	if (Cursor->range.Type == 0) {
 		g_pRenderTarget->FillRectangle(D2D1::RectF(Rect.left, Rect.top, Rect.right, Rect.top + 1.25f), g_pBrush);
 	}
-	else {
+	else if (Cursor->range.Type == 1) {
 		g_pRenderTarget->FillRectangle(D2D1::RectF(Rect.left, Rect.top, Rect.left + 1.25f, Rect.bottom), g_pBrush);
+	}
+	else if (Cursor->range.Type == 2) {
+		g_pRenderTarget->FillRectangle(D2D1::RectF(Rect.left, Rect.bottom - 1.25f, Rect.right, Rect.bottom), g_pBrush);
+	}
+	else {
+		g_pRenderTarget->FillRectangle(D2D1::RectF(Rect.right - 1.25f, Rect.top, Rect.right, Rect.bottom), g_pBrush);
 	}
 
 	D2D1_RECT_F HideButtonRect = Cursor->range.Range[L"EffectsListHide"];
@@ -1273,5 +1497,10 @@ void P_Effects::Draw(CUR *Cursor) {
 	g_pRenderTarget->FillRectangle(HideButtonRect, g_pBrush);
 	g_pBrush->SetColor(D2D1::ColorF(0xffffff, HideButtonHoverAnime * 0.1f));
 	g_pRenderTarget->FillRectangle(HideButtonRect, g_pBrush);
-	Draw_Svg(331, HideButtonRect, 0.5f, HideNum * (Cursor->range.Type == 0 ? -180.0f : 180.0f) - 180.0f + -90.0f * Cursor->range.Type, D2D1::ColorF(config->get_color_code(config, "Text")));
+	if (Hide && Cursor->drag) {
+		Draw_Text(HideButtonRect, L"適応", TextAlign::Center, 18.0f);
+	}
+	else {
+		Draw_Svg(331, HideButtonRect, 0.5f, HideNum * (Cursor->range.Type == 0 ? -180.0f : 180.0f) - 180.0f + -90.0f * Cursor->range.Type, D2D1::ColorF(config->get_color_code(config, "Text")));
+	}
 }
