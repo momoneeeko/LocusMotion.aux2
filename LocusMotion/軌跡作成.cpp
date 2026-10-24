@@ -377,8 +377,22 @@ double LOCUSES::PlayModifier(double x, double Time, double framerate, int n) {
             break;
         }
         case 8: {   // 積分
-            int divisions = Modifier[i].Param[0] * t;
-            if (t > 0.0001 && divisions > 0) {
+            int divisions = Modifier[i].Param[0];
+            double scale = 1.0;
+            if (divisions > 0) {
+                double dt = 1.0 / divisions;
+                double sum = 0.0;
+                double prev_val = LocusesToValue(0.0, n);
+                for (int k = 1; k <= divisions; k++) {
+                    double cur_val = LocusesToValue(k * dt, n);
+                    sum += (prev_val + cur_val) * 0.5 * dt;
+                    prev_val = cur_val;
+                }
+                scale = 1.0 / sum;
+            }
+
+            divisions = Modifier[i].Param[0] * t;
+            if (t != 0 && divisions > 0) {
                 double dt = t / divisions;
                 double sum = 0.0;
                 double prev_val = LocusesToValue(0.0, n);
@@ -387,7 +401,7 @@ double LOCUSES::PlayModifier(double x, double Time, double framerate, int n) {
                     sum += (prev_val + cur_val) * 0.5 * dt;
                     prev_val = cur_val;
                 }
-                out = sum;
+                out = sum * scale;
             }
             else {
                 out = 0.0;

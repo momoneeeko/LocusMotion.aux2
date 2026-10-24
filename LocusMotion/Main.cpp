@@ -23,7 +23,7 @@ HCURSOR hDragCursor = NULL;
 //---------------------------------------------------------------------
 COMMON_PLUGIN_TABLE common_plugin_table = {
 	L"LocusMotion",								// プラグインの名前
-	L"LocusMotion β6.0 もも猫(@momo_neeeko)",		// プラグインの情報
+	L"LocusMotion β6.1 もも猫(@momo_neeeko)",		// プラグインの情報
 };
 
 //---------------------------------------------------------------------
@@ -365,7 +365,7 @@ SCRIPT_MODULE_FUNCTION functions[] = {
 };
 
 SCRIPT_MODULE_TABLE script_module_table = {
-	L"LocusMotion β6.0 もも猫(@momo_neeeko)",
+	L"LocusMotion β6.1 もも猫(@momo_neeeko)",
 	functions
 };
 
